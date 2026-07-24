@@ -6,7 +6,6 @@ import logging
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
@@ -21,7 +20,6 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="DCC Codex", docs_url=None, redoc_url=None)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 IMAGE_BUCKET = "dcc-codex"
