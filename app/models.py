@@ -85,8 +85,16 @@ class Entity(Base):
     first_book = relationship("Book", foreign_keys=[first_book_id])
     first_chapter = relationship("Chapter", foreign_keys=[first_chapter_id])
     passages = relationship("Passage", back_populates="entity")
-    relationships_as_a = relationship("EntityRelationship", foreign_keys="EntityRelationship.entity_a_id", back_populates="entity_a")
-    relationships_as_b = relationship("EntityRelationship", foreign_keys="EntityRelationship.entity_b_id", back_populates="entity_b")
+    relationships_as_a = relationship(
+        "EntityRelationship",
+        foreign_keys="EntityRelationship.entity_a_id",
+        back_populates="entity_a",
+    )
+    relationships_as_b = relationship(
+        "EntityRelationship",
+        foreign_keys="EntityRelationship.entity_b_id",
+        back_populates="entity_b",
+    )
 
 
 class Passage(Base):
@@ -112,12 +120,21 @@ class EntityRelationship(Base):
     id = Column(Integer, primary_key=True)
     entity_a_id = Column(Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
     entity_b_id = Column(Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
-    relationship = Column(String(100), nullable=False)
+    # NOTE: named relation_type (not relationship) to avoid shadowing the SQLAlchemy relationship() function
+    relation_type = Column(String(100), nullable=False)
     evidence = Column(Text)
     chapter_id = Column(Integer, ForeignKey("chapters.id"))
 
-    __table_args__ = (UniqueConstraint("entity_a_id", "entity_b_id", "relationship"),)
+    __table_args__ = (UniqueConstraint("entity_a_id", "entity_b_id", "relation_type"),)
 
-    entity_a = relationship("Entity", foreign_keys=[entity_a_id], back_populates="relationships_as_a")
-    entity_b = relationship("Entity", foreign_keys=[entity_b_id], back_populates="relationships_as_b")
+    entity_a = relationship(
+        "Entity",
+        foreign_keys="[EntityRelationship.entity_a_id]",
+        back_populates="relationships_as_a",
+    )
+    entity_b = relationship(
+        "Entity",
+        foreign_keys="[EntityRelationship.entity_b_id]",
+        back_populates="relationships_as_b",
+    )
     chapter = relationship("Chapter")
