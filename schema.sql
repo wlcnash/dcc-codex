@@ -103,10 +103,10 @@ CREATE TABLE entity_relationships (
     id              SERIAL PRIMARY KEY,
     entity_a_id     INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
     entity_b_id     INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
-    relationship    VARCHAR(100) NOT NULL,  -- 'ally', 'enemy', 'owner', 'member_of', 'companion', etc.
+    relation_type   VARCHAR(100) NOT NULL,  -- 'ally', 'enemy', 'owner', 'member_of', 'companion', etc.
     evidence        TEXT,                   -- passage that establishes this relationship
     chapter_id      INTEGER REFERENCES chapters(id),
-    UNIQUE (entity_a_id, entity_b_id, relationship)
+    UNIQUE (entity_a_id, entity_b_id, relation_type)
 );
 
 CREATE INDEX idx_relationships_a ON entity_relationships(entity_a_id);
