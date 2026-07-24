@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if entity_type %}{{ entity_type_labels[entity_type] }}{% else %}Browse{% endif %} — DCC Codex
+{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+  <h1 class="font-display text-3xl text-gold tracking-wide">
+    {% if entity_type %}{{ entity_type_labels.get(entity_type, entity_type) }}
+    {% else %}All Entities{% endif %}
+    {% if total %}<span class="text-lg text-gray-500 font-normal ml-3">{{ total }}</span>{% endif %}
+  </h1>
+</div>
+
+<!-- Filters -->
+<form method="get" action="/browse" class="flex flex-wrap gap-3 mb-8">
+  <!-- Type tabs -->
+  <div class="flex flex-wrap gap-2 w-full">
+    <a href="/browse{% if q %}?q={{ q }}{% endif %}"
+       class="px-3 py-1 rounded text-sm transition {% if not entity_type %}bg-yellow-700 text-yellow-100{% else %}bg-gray-800 text-gray-400 hover:text-gold{% endif %}">
+      All
+    </a>
+    {% for type_key, label in entity_type_labels.items() %}
+    <a href="/browse?entity_type={{ type_key }}{% if q %}&q={{ q }}{% endif %}"
+       class="px-3 py-1 rounded text-sm transition {% if entity_type == type_key %}bg-yellow-700 text-yellow-100{% else %}bg-gray-800 text-gray-400 hover:text-gold{% endif %}">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Search + major filter -->
+  <div class="flex gap-3 items-center mt-2">
+    <input
+      type="text" name="q" value="{{ q or '' }}"
+      placeholder="Search names..."
+      class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-yellow-600 text-gray-200 placeholder-gray-500 w-48"
+    >
+    {% if entity_type %}<input type="hidden" name="entity_type" value="{{ entity_type }}">{% endif %}
+    <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+      <input type="checkbox" name="major_only" value="true" {% if major_only %}checked{% endif %}
+             class="accent-yellow-600">
+      Major only
+    </label>
+    <button type="submit"
+            class="bg-yellow-700 hover:bg-yellow-600 text-yellow-100 px-4 py-1.5 rounded text-sm transition">
+      Filter
+    </button>
+    {% if q or major_only %}
+    <a href="/browse{% if entity_type %}?entity_type={{ entity_type }}{% endif %}"
+       class="text-sm text-gray-500 hover:text-gray-300 transition">Clear</a>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Grid -->
+{% if entities %}
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+  {% for entity in entities %}
+  <a href="/entity/{{ entity.slug }}"
+     class="dungeon-card rounded-lg overflow-hidden transition-all hover:scale-105 group">
+    {% if entity.image_url %}
+    <img src="{{ entity.image_url }}" alt="{{ entity.name }}"
+         class="w-full aspect-square object-cover group-hover:opacity-90 transition">
+    {% else %}
+    <div class="w-full aspect-square bg-gray-900 flex flex-col items-center justify-center">
+      <span class="text-gray-700 text-3xl">
+        {% if entity.entity_type.value == 'character' %}👤
+        {% elif entity.entity_type.value == 'creature' %}🐉
+        {% elif entity.entity_type.value == 'item' %}⚔
+        {% elif entity.entity_type.value == 'location' %}🗺
+        {% elif entity.entity_type.value == 'floor' %}🏚
+        {% elif entity.entity_type.value == 'ability' %}✨
+        {% elif entity.entity_type.value == 'faction' %}⚑
+        {% else %}?{% endif %}
+      </span>
+      <span class="text-gray-700 text-xs mt-1">No image yet</span>
+    </div>
+    {% endif %}
+    <div class="p-3">
+      <div class="text-sm font-semibold text-gray-200 truncate">{{ entity.name }}</div>
+      <div class="flex items-center gap-1 mt-1">
+        <span class="text-xs px-1.5 py-0.5 rounded badge-{{ entity.entity_type.value }} capitalize">
+          {{ entity.entity_type.value }}
+        </span>
+        {% if entity.is_major %}
+        <span class="text-xs text-yellow-600">★</span>
+        {% endif %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="flex justify-center gap-2 mt-12">
+  {% if page > 1 %}
+  <a href="?{% if entity_type %}entity_type={{ entity_type }}&{% endif %}{% if q %}q={{ q }}&{% endif %}page={{ page - 1 }}"
+     class="px-4 py-2 rounded bg-gray-800 text-gray-400 hover:text-gold transition text-sm">← Prev</a>
+  {% endif %}
+  <span class="px-4 py-2 text-sm text-gray-500">Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}
+  <a href="?{% if entity_type %}entity_type={{ entity_type }}&{% endif %}{% if q %}q={{ q }}&{% endif %}page={{ page + 1 }}"
+     class="px-4 py-2 rounded bg-gray-800 text-gray-400 hover:text-gold transition text-sm">Next →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="text-center py-24 text-gray-600">
+  <div class="text-5xl mb-4">🔍</div>
+  <p class="text-lg">No entities found.</p>
+  {% if q %}<p class="text-sm mt-2">Try a different search term.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

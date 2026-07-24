@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: dcc-codex
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - pvc.yaml
+  - configmap-startup-notify.yaml
+  - externalsecret-discord.yaml
+  - externalsecret-app.yaml
+  - deployment.yaml
+  - service.yaml
+  - certificate.yaml
+  - ingressroute.yaml

@@ -1,0 +1,17 @@
+FROM python:3.12-slim
+
+WORKDIR /seeder
+
+# System deps for lxml
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libxml2 libxslt1.1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY seeder/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY seeder/ .
+COPY schema.sql ..
+
+ENTRYPOINT ["python", "main.py"]
+CMD ["--step", "all"]

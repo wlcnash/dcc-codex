@@ -1,0 +1,44 @@
+# One-time seeder job — run manually after initial deploy
+# kubectl apply -f manifests/job-seeder.yaml -n dcc-codex
+# kubectl logs -f job/dcc-codex-seeder -n dcc-codex
+#
+# To re-run: delete the job and re-apply
+# kubectl delete job dcc-codex-seeder -n dcc-codex
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dcc-codex-seeder
+  namespace: dcc-codex
+spec:
+  ttlSecondsAfterFinished: 86400  # keep logs for 24h after completion
+  backoffLimit: 0  # don't retry on failure — scraping is stateful
+  template:
+    spec:
+      serviceAccountName: dcc-codex
+      restartPolicy: Never
+      containers:
+        - name: seeder
+          image: ghcr.io/wlcnash/dcc-codex-seeder:main
+          imagePullPolicy: Always
+          args: ["--step", "all"]
+          env:
+            - name: POSTGRES_HOST
+              value: postgres.dcc-codex.svc.cluster.local
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: dcccodex
+            - name: POSTGRES_USER
+              value: dcccodex
+            - name: MINIO_ENDPOINT
+              value: http://192.168.2.179:9100  # MinIO on NAS-1 (direct, not cluster DNS)
+          envFrom:
+            - secretRef:
+                name: dcc-codex-secrets
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi

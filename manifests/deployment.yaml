@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dcc-codex
+  namespace: dcc-codex
+  labels:
+    app: dcc-codex
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: dcc-codex
+  template:
+    metadata:
+      labels:
+        app: dcc-codex
+    spec:
+      serviceAccountName: dcc-codex
+      containers:
+        - name: dcc-codex
+          image: ghcr.io/wlcnash/dcc-codex:main  # pinned to main branch sha via Renovate
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: POSTGRES_HOST
+              value: postgres.dcc-codex.svc.cluster.local
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: dcccodex
+            - name: POSTGRES_USER
+              value: dcccodex
+            - name: MINIO_ENDPOINT
+              value: http://minio.minio.svc.cluster.local:9000
+          envFrom:
+            - secretRef:
+                name: dcc-codex-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    ( sleep 60 && sh /notify/notify.sh ) &
+          volumeMounts:
+            - name: notify-script
+              mountPath: /notify/notify.sh
+              subPath: notify.sh
+            - name: discord-webhook
+              mountPath: /notify/url
+              subPath: url
+      volumes:
+        - name: notify-script
+          configMap:
+            name: dcc-codex-startup-notify
+            defaultMode: 0755
+        - name: discord-webhook
+          secret:
+            secretName: discord-webhook
+---
+# PostgreSQL deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: dcc-codex
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # exclusive file lock on PVC
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      serviceAccountName: dcc-codex
+      containers:
+        - name: postgres
+          image: postgres:16.3
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: dcccodex
+            - name: POSTGRES_USER
+              value: dcccodex
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dcc-codex-secrets
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "dcccodex", "-d", "dcccodex"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "dcccodex", "-d", "dcccodex"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data

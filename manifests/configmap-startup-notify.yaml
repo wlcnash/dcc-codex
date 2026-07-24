@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dcc-codex-startup-notify
+  namespace: dcc-codex
+data:
+  notify.sh: |
+    #!/bin/sh
+    # Read version dynamically from uvicorn/package metadata
+    VERSION=$(python3 -c "import importlib.metadata; print(importlib.metadata.version('fastapi'))" 2>/dev/null || echo "unknown")
+    APP_VERSION=$(cat /app/version.txt 2>/dev/null || echo "1.0.0")
+
+    WEBHOOK_URL=$(cat /notify/url)
+    curl -sf -X POST "$WEBHOOK_URL" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"embeds\": [{
+          \"title\": \"⚔ DCC Codex started\",
+          \"description\": \"Dungeon Crawler Carl compendium is online.\",
+          \"color\": 12895428,
+          \"fields\": [
+            {\"name\": \"Version\", \"value\": \"$APP_VERSION\", \"inline\": true},
+            {\"name\": \"URL\", \"value\": \"https://dcc-codex.home\", \"inline\": true}
+          ]
+        }]
+      }" || true
