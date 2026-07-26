@@ -6,52 +6,170 @@
   <title>{% block title %}DCC Codex{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Source+Serif+4:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;1,8..60,300;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Source Serif 4', Georgia, serif; }
-    .font-display { font-family: 'Cinzel', serif; }
-    .dungeon-card {
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      border: 1px solid #2d3561;
+    :root {
+      --gold: #c89b3c;
+      --gold-dim: #8a6a28;
+      --dungeon-bg: #080810;
+      --dungeon-surface: #0f0f1e;
+      --dungeon-card: #111124;
+      --dungeon-border: #1e2040;
+      --dungeon-border-hover: #c89b3c;
+      --system-amber: #d97706;
+      --system-amber-dim: #92400e;
+      --danger: #991b1b;
     }
-    .dungeon-card:hover { border-color: #c89b3c; }
-    .text-gold { color: #c89b3c; }
-    .bg-dungeon { background-color: #0d0d1a; }
-    .badge-character { background: #1e3a5f; color: #7fb3d3; }
-    .badge-creature  { background: #3a1e1e; color: #d37f7f; }
-    .badge-item      { background: #2d2a1e; color: #d3c47f; }
-    .badge-location  { background: #1e3a2a; color: #7fd38e; }
-    .badge-floor     { background: #2d1e3a; color: #b87fd3; }
-    .badge-ability   { background: #3a2a1e; color: #d3a07f; }
-    .badge-faction   { background: #1e2a3a; color: #7fbbd3; }
-    .badge-other     { background: #2a2a2a; color: #aaaaaa; }
+
+    body {
+      font-family: 'Source Serif 4', Georgia, serif;
+      background-color: var(--dungeon-bg);
+      /* Subtle noise texture */
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    }
+
+    .font-display  { font-family: 'Cinzel', serif; }
+    .font-mono-sys { font-family: 'JetBrains Mono', 'Fira Mono', monospace; }
+
+    /* Cards */
+    .dungeon-card {
+      background: var(--dungeon-card);
+      border: 1px solid var(--dungeon-border);
+      transition: border-color 0.15s ease;
+    }
+    .dungeon-card:hover { border-color: var(--dungeon-border-hover); }
+
+    /* Type badges */
+    .badge-character { background: #0f2340; color: #6baed6; }
+    .badge-creature  { background: #2d0d0d; color: #c97070; }
+    .badge-item      { background: #241e0a; color: #c9aa60; }
+    .badge-location  { background: #0d2314; color: #60c97a; }
+    .badge-floor     { background: #1a0d2e; color: #a065c9; }
+    .badge-ability   { background: #251510; color: #c97a50; }
+    .badge-faction   { background: #0d1b26; color: #60a8c9; }
+    .badge-other     { background: #1a1a1a; color: #888; }
+
+    /* System AI terminal block */
+    .system-terminal {
+      background: #09090f;
+      border: 1px solid #3d2e00;
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+    .system-terminal-header {
+      background: #110e00;
+      border-bottom: 1px solid #3d2e00;
+      padding: 0.5rem 1rem;
+    }
+    .system-terminal-body {
+      padding: 1rem 1.25rem;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--dungeon-bg); }
+    ::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+    /* Gold text utility */
+    .text-gold { color: var(--gold); }
+    .text-gold-dim { color: var(--gold-dim); }
+
+    /* Passage blockquote */
+    .passage-quote {
+      border-left: 2px solid #5a3e0a;
+      padding-left: 1rem;
+      color: #d4cfc8;
+      line-height: 1.75;
+    }
+    .passage-quote:hover { border-left-color: var(--gold); }
+
+    /* Spoiler shield banner */
+    .spoiler-shield {
+      background: linear-gradient(90deg, #0e1a0e 0%, #111a11 100%);
+      border: 1px solid #1a3a1a;
+      border-left: 3px solid #2d6a2d;
+    }
+
+    /* Book selector */
+    .book-select {
+      -webkit-appearance: none;
+      appearance: none;
+      background-color: transparent;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.5rem center;
+      padding-right: 1.5rem;
+    }
+
+    /* Ornamental divider */
+    .ornament::before { content: '— '; color: var(--gold-dim); }
+    .ornament::after  { content: ' —'; color: var(--gold-dim); }
   </style>
   {% block head %}{% endblock %}
 </head>
-<body class="bg-dungeon text-gray-200 min-h-screen">
+<body class="text-gray-200 min-h-screen">
+
+  <!-- Spoiler shield banner -->
+  {% if max_book %}
+  <div class="spoiler-shield px-4 py-2 text-center text-xs text-green-400 font-mono-sys tracking-wide">
+    <span class="text-green-600">■</span>
+    SPOILER SHIELD ACTIVE — Showing content through
+    <strong class="text-green-300">Book {{ max_book }}{% if max_book_obj %}: {{ max_book_obj.title }}{% endif %}</strong>
+    <span class="text-green-700 mx-2">·</span>
+    <a href="/set-book?redirect_to={{ request.url.path }}" class="text-green-600 hover:text-green-400 underline underline-offset-2 transition">
+      Clear filter
+    </a>
+  </div>
+  {% endif %}
 
   <!-- Nav -->
-  <nav class="border-b border-gray-800 bg-gray-950 bg-opacity-80 sticky top-0 z-50 backdrop-blur">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-      <a href="/" class="font-display text-xl font-bold text-gold tracking-widest hover:text-yellow-300 transition">
+  <nav class="border-b border-gray-900 bg-black bg-opacity-70 sticky top-0 z-50 backdrop-blur-sm">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
+
+      <!-- Logo -->
+      <a href="/" class="font-display text-lg font-bold text-gold tracking-widest hover:text-yellow-300 transition flex-shrink-0">
         ⚔ DCC Codex
       </a>
-      <div class="flex items-center gap-6 text-sm">
-        <a href="/browse" class="text-gray-400 hover:text-gold transition">Browse</a>
-        <a href="/browse?entity_type=character" class="text-gray-400 hover:text-gold transition">Characters</a>
-        <a href="/browse?entity_type=creature" class="text-gray-400 hover:text-gold transition">Creatures</a>
-        <a href="/browse?entity_type=item" class="text-gray-400 hover:text-gold transition">Items</a>
-        <!-- Typeahead search -->
-        <div class="relative">
-          <input
-            id="nav-search"
-            type="text"
-            placeholder="Search..."
-            class="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-yellow-600 w-48"
-          >
-          <div id="nav-search-results" class="absolute right-0 top-9 bg-gray-900 border border-gray-700 rounded shadow-xl w-72 hidden z-50"></div>
+
+      <!-- Nav links -->
+      <div class="flex items-center gap-5 text-sm flex-1">
+        <a href="/browse" class="text-gray-500 hover:text-gold transition">Browse</a>
+        <a href="/browse?entity_type=character" class="text-gray-500 hover:text-gold transition hidden sm:inline">Characters</a>
+        <a href="/browse?entity_type=creature" class="text-gray-500 hover:text-gold transition hidden md:inline">Creatures</a>
+        <a href="/browse?entity_type=location" class="text-gray-500 hover:text-gold transition hidden lg:inline">Locations</a>
+      </div>
+
+      <!-- Book selector -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="text-gray-700 text-xs font-mono-sys hidden sm:inline">READING:</span>
+        <select
+          id="book-selector"
+          class="book-select bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-400 py-1 pl-2 focus:outline-none focus:border-yellow-800 cursor-pointer transition"
+        >
+          <option value="" class="bg-gray-900">All Books</option>
+          {% for book in books %}
+          <option value="{{ book.book_number }}" class="bg-gray-900"
+            {% if max_book == book.book_number %}selected{% endif %}>
+            Book {{ book.book_number }}{% if max_book == book.book_number %}: {{ book.title[:28] }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Typeahead search -->
+      <div class="relative flex-shrink-0">
+        <input
+          id="nav-search"
+          type="text"
+          placeholder="Search..."
+          class="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm text-gray-200 placeholder-gray-700 focus:outline-none focus:border-yellow-800 w-40 transition hover:border-gray-700"
+        >
+        <div id="nav-search-results"
+             class="absolute right-0 top-10 bg-gray-950 border border-gray-800 rounded shadow-2xl w-80 hidden z-50 overflow-hidden">
         </div>
       </div>
+
     </div>
   </nav>
 
@@ -61,44 +179,59 @@
   </main>
 
   <!-- Footer -->
-  <footer class="border-t border-gray-800 mt-16 py-8 text-center text-gray-600 text-sm">
-    <p>DCC Codex — A fan compendium for <em>Dungeon Crawler Carl</em> by Matt Dinniman.</p>
-    <p class="mt-1">All text excerpts © Matt Dinniman. Images generated from author descriptions via Imagen 3.</p>
+  <footer class="border-t border-gray-900 mt-20 py-10 text-center text-gray-700 text-xs font-mono-sys">
+    <p class="tracking-wide">DCC CODEX — FAN COMPENDIUM FOR <em class="not-italic text-gray-600">DUNGEON CRAWLER CARL</em> BY MATT DINNIMAN</p>
+    <p class="mt-2 text-gray-800">All text excerpts © Matt Dinniman · Images generated via Imagen 3 from source text · Not affiliated with the author</p>
   </footer>
 
   <script>
-    // Typeahead search
-    const input = document.getElementById('nav-search');
-    const results = document.getElementById('nav-search-results');
+    // ── Book selector ──────────────────────────────────────────────
+    document.getElementById('book-selector')?.addEventListener('change', function () {
+      const val = this.value;
+      const here = encodeURIComponent(location.pathname + location.search);
+      location.href = val
+        ? `/set-book?book=${val}&redirect_to=${here}`
+        : `/set-book?redirect_to=${here}`;
+    });
+
+    // ── Typeahead search ───────────────────────────────────────────
+    const searchInput   = document.getElementById('nav-search');
+    const searchResults = document.getElementById('nav-search-results');
     let debounce;
 
-    input?.addEventListener('input', () => {
+    searchInput?.addEventListener('input', () => {
       clearTimeout(debounce);
-      const q = input.value.trim();
-      if (q.length < 2) { results.classList.add('hidden'); return; }
+      const q = searchInput.value.trim();
+      if (q.length < 2) { searchResults.classList.add('hidden'); return; }
       debounce = setTimeout(async () => {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         const data = await res.json();
-        if (!data.length) { results.classList.add('hidden'); return; }
-        results.innerHTML = data.map(e => `
-          <a href="/entity/${e.slug}" class="flex items-center gap-3 px-3 py-2 hover:bg-gray-800 transition border-b border-gray-800 last:border-0">
+        if (!data.length) { searchResults.classList.add('hidden'); return; }
+        searchResults.innerHTML = data.map(e => `
+          <a href="/entity/${e.slug}"
+             class="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-900 transition border-b border-gray-900 last:border-0">
             ${e.image_url
-              ? `<img src="${e.image_url}" class="w-8 h-8 rounded object-cover flex-shrink-0">`
-              : `<div class="w-8 h-8 rounded bg-gray-800 flex-shrink-0"></div>`
+              ? `<img src="${e.image_url}" class="w-9 h-9 rounded object-cover flex-shrink-0 opacity-90">`
+              : `<div class="w-9 h-9 rounded bg-gray-800 flex-shrink-0 flex items-center justify-center text-gray-600 text-sm">${entityIcon(e.type)}</div>`
             }
-            <div>
-              <div class="text-sm text-gray-200">${e.name}</div>
-              <div class="text-xs text-gray-500 capitalize">${e.type}</div>
+            <div class="min-w-0">
+              <div class="text-sm text-gray-200 truncate">${e.name}</div>
+              <div class="text-xs text-gray-600 capitalize mt-0.5">${e.type}</div>
             </div>
           </a>
         `).join('');
-        results.classList.remove('hidden');
+        searchResults.classList.remove('hidden');
       }, 200);
     });
 
-    document.addEventListener('click', (e) => {
-      if (!input?.contains(e.target) && !results?.contains(e.target)) {
-        results?.classList.add('hidden');
+    function entityIcon(type) {
+      const icons = { character:'👤', creature:'🐉', item:'⚔', location:'🗺', floor:'🏚', ability:'✨', faction:'⚑' };
+      return icons[type] || '◈';
+    }
+
+    document.addEventListener('click', e => {
+      if (!searchInput?.contains(e.target) && !searchResults?.contains(e.target)) {
+        searchResults?.classList.add('hidden');
       }
     });
   </script>
