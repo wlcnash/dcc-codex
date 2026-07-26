@@ -101,7 +101,7 @@ def extract_from_chapter(chapter_text: str, client) -> Optional[dict]:
 
 
 def upsert_entity(cur, entity_data: dict, first_book_id: int, first_chapter_id: int) -> Optional[int]:
-    """Insert or update an entity. Returns entity_id."""
+    """Insert or update an entity. Returns entity_id. Raises on DB error (caller uses savepoint)."""
     name = entity_data["name"].strip()
     if not name:
         return None
@@ -130,24 +130,29 @@ def upsert_entity(cur, entity_data: dict, first_book_id: int, first_chapter_id: 
             )
         return entity_id
 
-    # Insert new entity
-    try:
-        cur.execute(
-            """
-            INSERT INTO entities (name, slug, entity_type, aliases, first_book_id, first_chapter_id, is_major)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (name) DO UPDATE SET
-                aliases = array(SELECT DISTINCT unnest(entities.aliases || EXCLUDED.aliases)),
-                is_major = entities.is_major OR EXCLUDED.is_major
-            RETURNING id
-            """,
-            (name, slug, entity_type, aliases, first_book_id, first_chapter_id, is_major),
-        )
-        row = cur.fetchone()
-        return row[0] if row else None
-    except Exception as e:
-        logger.error(f"Failed to upsert entity '{name}': {e}")
-        return None
+    # Ensure slug is unique by appending a counter if needed
+    base_slug = slug
+    counter = 1
+    while True:
+        cur.execute("SELECT id FROM entities WHERE slug = %s", (slug,))
+        if not cur.fetchone():
+            break
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+
+    cur.execute(
+        """
+        INSERT INTO entities (name, slug, entity_type, aliases, first_book_id, first_chapter_id, is_major)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (name) DO UPDATE SET
+            aliases = array(SELECT DISTINCT unnest(entities.aliases || EXCLUDED.aliases)),
+            is_major = entities.is_major OR EXCLUDED.is_major
+        RETURNING id
+        """,
+        (name, slug, entity_type, aliases, first_book_id, first_chapter_id, is_major),
+    )
+    row = cur.fetchone()
+    return row[0] if row else None
 
 
 def insert_passages(cur, entity_id: int, chapter_id: int, passages: list[dict]):
@@ -231,21 +236,32 @@ def run_extractor(conn, gemini_api_key: str, batch_size: int = 10):
 
         if not result or "entities" not in result:
             logger.warning(f"  No entities extracted from chapter {chap_num}")
-            # Insert a sentinel passage so we don't re-process
             continue
 
-        for entity_data in result["entities"]:
-            entity_id = upsert_entity(cur, entity_data, book_id, chap_id)
-            if entity_id is None:
-                continue
+        chapter_entities = 0
+        chapter_passages = 0
 
-            passages = entity_data.get("passages", [])
-            insert_passages(cur, entity_id, chap_id, passages)
-            total_entities += 1
-            total_passages += len(passages)
+        for entity_data in result["entities"]:
+            # Use a savepoint per entity so one failure doesn't abort the chapter's transaction
+            try:
+                cur.execute("SAVEPOINT sp_entity")
+                entity_id = upsert_entity(cur, entity_data, book_id, chap_id)
+                if entity_id is None:
+                    cur.execute("RELEASE SAVEPOINT sp_entity")
+                    continue
+                passages = entity_data.get("passages", [])
+                insert_passages(cur, entity_id, chap_id, passages)
+                cur.execute("RELEASE SAVEPOINT sp_entity")
+                total_entities += 1
+                total_passages += len(passages)
+                chapter_entities += 1
+                chapter_passages += len(passages)
+            except Exception as e:
+                cur.execute("ROLLBACK TO SAVEPOINT sp_entity")
+                logger.warning(f"  Skipped entity '{entity_data.get('name', '?')}': {e}")
 
         conn.commit()
-        logger.info(f"  Committed chapter {chap_num}: {len(result['entities'])} entities")
+        logger.info(f"  Committed chapter {chap_num}: {chapter_entities} entities, {chapter_passages} passages")
 
     cur.close()
     logger.info(f"Extraction complete. {total_entities} entity refs, {total_passages} passages.")
