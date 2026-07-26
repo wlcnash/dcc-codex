@@ -20,7 +20,7 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 IMAGE_BUCKET = "dcc-codex"
-RATE_LIMIT_SECONDS = 3.0  # Image gen has stricter rate limits
+RATE_LIMIT_SECONDS = 3.0
 
 PROMPT_BUILDER_SYSTEM = """You are creating image generation prompts for a Dungeon Crawler Carl compendium.
 Your goal is to create vivid, accurate visualizations based ONLY on the author's exact descriptions.
@@ -41,9 +41,7 @@ Max 400 words."""
 def build_image_prompt(entity_name: str, entity_type: str, passages: list[str], client) -> str:
     """Use Gemini Flash to synthesize a detailed image prompt from passages."""
     passages_text = "\n\n---\n\n".join(f'"{p}"' for p in passages[:10])
-
     prompt = f"{PROMPT_BUILDER_SYSTEM}\n\n{PROMPT_BUILDER_USER.format(entity_name=entity_name, entity_type=entity_type, passages=passages_text)}"
-
     response = client.models.generate_content(
         model="gemini-3.6-flash",
         contents=prompt,
@@ -53,17 +51,14 @@ def build_image_prompt(entity_name: str, entity_type: str, passages: list[str], 
 
 
 def generate_image(prompt: str, client) -> bytes | None:
-    """
-    Call Nano Banana 2 (gemini-3.1-flash-image) via Interactions API.
-    Returns PNG bytes or None.
-    """
+    """Call Nano Banana 2 via Interactions API. Returns JPEG bytes or None."""
     try:
         interaction = client.interactions.create(
             model="gemini-3.1-flash-image",
             input=prompt,
             response_format={
                 "type": "image",
-                "mime_type": "image/png",
+                "mime_type": "image/jpeg",
                 "aspect_ratio": "1:1",
                 "image_size": "1K",
             },
@@ -80,18 +75,17 @@ def generate_image(prompt: str, client) -> bytes | None:
 
 def upload_to_minio(minio_client, entity_slug: str, image_bytes: bytes) -> str:
     """Upload image to MinIO and return the public URL."""
-    key = f"entities/{entity_slug}.png"
+    key = f"entities/{entity_slug}.jpg"
     minio_client.put_object(
         Bucket=IMAGE_BUCKET,
         Key=key,
         Body=io.BytesIO(image_bytes),
-        ContentType="image/png",
+        ContentType="image/jpeg",
     )
-    return f"/images/{entity_slug}.png"  # served via app proxy
+    return f"/images/{entity_slug}.jpg"
 
 
 def ensure_bucket(minio_client):
-    """Create the dcc-codex bucket if it doesn't exist."""
     try:
         minio_client.head_bucket(Bucket=IMAGE_BUCKET)
     except Exception:
@@ -107,10 +101,6 @@ def run_imager(
     minio_secret_key: str,
     batch_size: int = 20,
 ):
-    """
-    Main image generation loop.
-    Finds entities with physical passages but no image, generates and uploads.
-    """
     client = genai.Client(api_key=gemini_api_key)
 
     minio_client = boto3.client(
@@ -123,9 +113,6 @@ def run_imager(
     ensure_bucket(minio_client)
 
     cur = conn.cursor()
-
-    # Find entities with physical passages but no image, major entities first.
-    # Use subquery to avoid DISTINCT + ORDER BY conflict.
     cur.execute(
         """
         SELECT id, name, slug, entity_type FROM (
@@ -151,49 +138,35 @@ def run_imager(
     generated = 0
 
     for entity_id, name, slug, entity_type in entities:
-        # Fetch physical description passages
         cur.execute(
-            """
-            SELECT passage_text FROM passages
-            WHERE entity_id = %s AND passage_type = 'physical'
-            ORDER BY id
-            """,
+            "SELECT passage_text FROM passages WHERE entity_id = %s AND passage_type = 'physical' ORDER BY id",
             (entity_id,),
         )
         passages = [row[0] for row in cur.fetchall()]
-
         if not passages:
             continue
 
         logger.info(f"  Generating image for: {name}")
 
-        # Build prompt from passages
         try:
             image_prompt = build_image_prompt(name, entity_type, passages, client)
         except Exception as e:
             logger.warning(f"  Prompt build failed for {name}: {e}")
             continue
 
-        # Generate image
         image_bytes = generate_image(image_prompt, client)
         if image_bytes is None:
             logger.warning(f"  Skipping {name} — Nano Banana returned no image")
             continue
 
-        # Upload to MinIO
         try:
             image_url = upload_to_minio(minio_client, slug, image_bytes)
         except Exception as e:
             logger.warning(f"  MinIO upload failed for {name}: {e}")
             continue
 
-        # Update entity record
         cur.execute(
-            """
-            UPDATE entities
-            SET image_url = %s, image_prompt = %s, image_source_passages = %s
-            WHERE id = %s
-            """,
+            "UPDATE entities SET image_url = %s, image_prompt = %s, image_source_passages = %s WHERE id = %s",
             (image_url, image_prompt, passages[:5], entity_id),
         )
         conn.commit()
