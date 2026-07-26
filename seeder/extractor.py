@@ -16,7 +16,8 @@ import time
 from typing import Optional
 import psycopg2
 from psycopg2.extras import execute_values
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +79,15 @@ def slugify(name: str) -> str:
     return slug
 
 
-def extract_from_chapter(chapter_text: str, model) -> Optional[dict]:
+def extract_from_chapter(chapter_text: str, client) -> Optional[dict]:
     """Call Gemini to extract entities and passages from a chapter."""
     prompt = EXTRACTION_PROMPT.format(chapter_text=chapter_text[:50000])  # cap at ~50k chars
 
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.1,  # low temp for factual extraction
             ),
@@ -194,8 +196,7 @@ def run_extractor(conn, gemini_api_key: str, batch_size: int = 10):
     Main extraction loop. Processes unextracted chapters in batches.
     Skips chapters that have already had entities extracted.
     """
-    genai.configure(api_key=gemini_api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    client = genai.Client(api_key=gemini_api_key)
 
     cur = conn.cursor()
 
@@ -225,7 +226,7 @@ def run_extractor(conn, gemini_api_key: str, batch_size: int = 10):
 
     for chap_id, book_id, chap_num, chap_title, raw_text in chapters:
         logger.info(f"  Processing chapter {chap_num}: {chap_title}")
-        result = extract_from_chapter(raw_text, model)
+        result = extract_from_chapter(raw_text, client)
 
         if not result or "entities" not in result:
             logger.warning(f"  No entities extracted from chapter {chap_num}")
