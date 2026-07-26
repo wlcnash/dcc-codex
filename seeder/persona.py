@@ -120,7 +120,7 @@ def run_persona(conn, gemini_api_key: str, batch_size: int = 999999) -> int:
 
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.6-flash",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.75,
@@ -159,4 +159,3 @@ def run_persona(conn, gemini_api_key: str, batch_size: int = 999999) -> int:
 
     logger.info(f"Persona generation complete: {count} entities processed.")
     return count
-
