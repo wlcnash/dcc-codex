@@ -1,11 +1,13 @@
 """
-Gemini Imagen image generator for DCC Codex.
+Gemini Nano Banana image generator for DCC Codex.
 
 For each entity with physical description passages but no image,
-builds a detailed prompt from those passages and calls Imagen 3
-to generate a visualization. Stores the result in MinIO.
+builds a detailed prompt from those passages and calls Nano Banana 2
+(gemini-3.1-flash-image) via the Interactions API to generate a
+visualization. Stores the result in MinIO.
 """
 
+import base64
 import io
 import logging
 import time
@@ -18,7 +20,7 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 IMAGE_BUCKET = "dcc-codex"
-RATE_LIMIT_SECONDS = 3.0  # Imagen has stricter rate limits
+RATE_LIMIT_SECONDS = 3.0  # Image gen has stricter rate limits
 
 PROMPT_BUILDER_SYSTEM = """You are creating image generation prompts for a Dungeon Crawler Carl compendium.
 Your goal is to create vivid, accurate visualizations based ONLY on the author's exact descriptions.
@@ -38,12 +40,12 @@ Max 400 words."""
 
 def build_image_prompt(entity_name: str, entity_type: str, passages: list[str], client) -> str:
     """Use Gemini Flash to synthesize a detailed image prompt from passages."""
-    passages_text = "\n\n---\n\n".join(f'"{p}"' for p in passages[:10])  # cap at 10 passages
+    passages_text = "\n\n---\n\n".join(f'"{p}"' for p in passages[:10])
 
     prompt = f"{PROMPT_BUILDER_SYSTEM}\n\n{PROMPT_BUILDER_USER.format(entity_name=entity_name, entity_type=entity_type, passages=passages_text)}"
 
     response = client.models.generate_content(
-        model="gemini-3.5-flash",
+        model="gemini-3.6-flash",
         contents=prompt,
         config=types.GenerateContentConfig(temperature=0.3),
     )
@@ -51,24 +53,28 @@ def build_image_prompt(entity_name: str, entity_type: str, passages: list[str], 
 
 
 def generate_image(prompt: str, client) -> bytes | None:
-    """Call Imagen 3 to generate an image. Returns PNG bytes or None."""
+    """
+    Call Nano Banana 2 (gemini-3.1-flash-image) via Interactions API.
+    Returns PNG bytes or None.
+    """
     try:
-        result = client.models.generate_images(
-            model="imagen-3.0-generate-001",
-            prompt=prompt,
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
-                safety_filter_level="BLOCK_ONLY_HIGH",
-                aspect_ratio="1:1",
-            ),
+        interaction = client.interactions.create(
+            model="gemini-3.1-flash-image",
+            input=prompt,
+            response_format={
+                "type": "image",
+                "mime_type": "image/png",
+                "aspect_ratio": "1:1",
+                "image_size": "1K",
+            },
         )
         time.sleep(RATE_LIMIT_SECONDS)
 
-        if result.generated_images:
-            return result.generated_images[0].image.image_bytes
+        if interaction.output_image and interaction.output_image.data:
+            return base64.b64decode(interaction.output_image.data)
         return None
     except Exception as e:
-        logger.error(f"Imagen generation failed: {e}")
+        logger.error(f"Nano Banana image generation failed: {e}")
         return None
 
 
@@ -81,7 +87,6 @@ def upload_to_minio(minio_client, entity_slug: str, image_bytes: bytes) -> str:
         Body=io.BytesIO(image_bytes),
         ContentType="image/png",
     )
-    # MinIO URL pattern for internal access
     return f"/images/{entity_slug}.png"  # served via app proxy
 
 
@@ -119,7 +124,7 @@ def run_imager(
 
     cur = conn.cursor()
 
-    # Find entities with physical passages but no image
+    # Find entities with physical passages but no image, major entities first
     cur.execute(
         """
         SELECT DISTINCT e.id, e.name, e.slug, e.entity_type::text
@@ -127,7 +132,7 @@ def run_imager(
         JOIN passages p ON p.entity_id = e.id
         WHERE p.passage_type = 'physical'
           AND (e.image_url IS NULL OR e.image_url = '')
-        ORDER BY e.id
+        ORDER BY e.is_major DESC, e.id
         LIMIT %s
         """,
         (batch_size,),
@@ -139,7 +144,7 @@ def run_imager(
         cur.close()
         return 0
 
-    logger.info(f"Generating images for {len(entities)} entities...")
+    logger.info(f"Generating images for {len(entities)} entities (Nano Banana 2)...")
     generated = 0
 
     for entity_id, name, slug, entity_type in entities:
@@ -160,16 +165,24 @@ def run_imager(
         logger.info(f"  Generating image for: {name}")
 
         # Build prompt from passages
-        image_prompt = build_image_prompt(name, entity_type, passages, client)
+        try:
+            image_prompt = build_image_prompt(name, entity_type, passages, client)
+        except Exception as e:
+            logger.warning(f"  Prompt build failed for {name}: {e}")
+            continue
 
         # Generate image
         image_bytes = generate_image(image_prompt, client)
         if image_bytes is None:
-            logger.warning(f"  Skipping {name} — Imagen returned no image")
+            logger.warning(f"  Skipping {name} — Nano Banana returned no image")
             continue
 
         # Upload to MinIO
-        image_url = upload_to_minio(minio_client, slug, image_bytes)
+        try:
+            image_url = upload_to_minio(minio_client, slug, image_bytes)
+        except Exception as e:
+            logger.warning(f"  MinIO upload failed for {name}: {e}")
+            continue
 
         # Update entity record
         cur.execute(
@@ -178,7 +191,7 @@ def run_imager(
             SET image_url = %s, image_prompt = %s, image_source_passages = %s
             WHERE id = %s
             """,
-            (image_url, image_prompt, passages[:5], entity_id),  # store up to 5 source passages
+            (image_url, image_prompt, passages[:5], entity_id),
         )
         conn.commit()
         generated += 1
