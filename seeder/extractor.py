@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 VALID_ENTITY_TYPES = {"character", "creature", "item", "location", "floor", "ability", "faction", "other"}
 VALID_PASSAGE_TYPES = {"physical", "personality", "backstory", "ability", "action", "other"}
 
+# Note: {{ and }} are escaped braces for str.format(); {chapter_text} is the real placeholder
 EXTRACTION_PROMPT = """You are a precise literary analyst processing the LitRPG web novel "Dungeon Crawler Carl."
 
 Analyze the chapter text below and extract ALL named entities — characters, creatures, items, locations, floors, abilities, and factions.
@@ -42,24 +43,24 @@ IMPORTANT RULES:
 - Include aliases if the text uses multiple names for the same entity
 
 Return a JSON object matching this exact schema:
-{
+{{
   "entities": [
-    {
+    {{
       "name": "string (canonical name)",
       "entity_type": "character|creature|item|location|floor|ability|faction|other",
       "aliases": ["list of alternate names used in this chapter"],
       "is_major": true/false,
       "passages": [
-        {
+        {{
           "passage_text": "exact verbatim text from chapter",
           "passage_type": "physical|personality|backstory|ability|action|other",
           "context_before": "up to 200 chars before the passage",
           "context_after": "up to 200 chars after the passage"
-        }
+        }}
       ]
-    }
+    }}
   ]
-}
+}}
 
 Only return the JSON object, no other text.
 
