@@ -2,178 +2,253 @@
 {% block title %}{{ entity.name }} — DCC Codex{% endblock %}
 
 {% block content %}
+
 <!-- Breadcrumb -->
-<nav class="text-sm text-gray-500 mb-6 flex items-center gap-2">
-  <a href="/" class="hover:text-gold transition">Home</a>
-  <span>›</span>
-  <a href="/browse?entity_type={{ entity.entity_type.value }}" class="hover:text-gold transition capitalize">
+<nav class="text-xs font-mono-sys text-gray-700 mb-8 flex items-center gap-2 tracking-wide">
+  <a href="/" class="hover:text-gold transition">HOME</a>
+  <span class="text-gray-800">›</span>
+  <a href="/browse?entity_type={{ entity.entity_type.value }}" class="hover:text-gold transition uppercase">
     {{ entity_type_labels.get(entity.entity_type.value, entity.entity_type.value) }}
   </a>
-  <span>›</span>
-  <span class="text-gray-300">{{ entity.name }}</span>
+  <span class="text-gray-800">›</span>
+  <span class="text-gray-500">{{ entity.name }}</span>
 </nav>
 
-<!-- Header -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+<!-- Header block -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+
   <!-- Image -->
   <div class="lg:col-span-1">
     {% if entity.image_url %}
-    <img src="{{ entity.image_url }}" alt="{{ entity.name }}"
-         class="w-full rounded-xl border border-gray-700 shadow-2xl">
+    <div class="relative rounded-xl overflow-hidden border border-gray-800 shadow-2xl group">
+      <img src="{{ entity.image_url }}" alt="{{ entity.name }}"
+           class="w-full object-cover group-hover:scale-[1.02] transition duration-500">
+      <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60"></div>
+    </div>
     {% else %}
-    <div class="w-full aspect-square rounded-xl border border-gray-800 bg-gray-900 flex flex-col items-center justify-center text-gray-700">
-      <span class="text-6xl mb-3">
-        {% if entity.entity_type.value == 'character' %}👤
-        {% elif entity.entity_type.value == 'creature' %}🐉
-        {% elif entity.entity_type.value == 'item' %}⚔
-        {% elif entity.entity_type.value == 'location' %}🗺
-        {% else %}?{% endif %}
-      </span>
-      <span class="text-sm">Image not yet generated</span>
+    <div class="w-full aspect-square rounded-xl border border-gray-900 bg-gray-950 flex flex-col items-center justify-center">
+      <span class="text-5xl mb-3 opacity-20">{{ entity_type_icons[entity.entity_type.value] }}</span>
+      <span class="font-mono-sys text-gray-800 text-xs tracking-widest">NO IMAGE GENERATED</span>
     </div>
     {% endif %}
 
     {% if entity.image_prompt %}
-    <details class="mt-3 text-xs text-gray-600">
-      <summary class="cursor-pointer hover:text-gray-400 transition">View image prompt</summary>
-      <p class="mt-2 leading-relaxed italic">{{ entity.image_prompt }}</p>
+    <details class="mt-3">
+      <summary class="font-mono-sys text-xs text-gray-700 cursor-pointer hover:text-gray-500 tracking-wide transition">
+        VIEW GENERATION PROMPT
+      </summary>
+      <p class="mt-2 text-xs text-gray-700 leading-relaxed italic border-l border-gray-800 pl-3">
+        {{ entity.image_prompt }}
+      </p>
     </details>
     {% endif %}
   </div>
 
-  <!-- Meta -->
+  <!-- Meta column -->
   <div class="lg:col-span-2">
-    <div class="flex flex-wrap items-start gap-3 mb-4">
-      <h1 class="font-display text-4xl font-bold text-gold tracking-wide">{{ entity.name }}</h1>
-      {% if entity.is_major %}
-      <span class="mt-2 text-yellow-500 text-sm bg-yellow-900 bg-opacity-30 px-2 py-0.5 rounded">★ Major</span>
+
+    <!-- Name + badges -->
+    <div class="mb-5">
+      <div class="flex flex-wrap items-center gap-3 mb-2">
+        <span class="px-3 py-1 rounded badge-{{ entity.entity_type.value }} capitalize font-mono-sys text-xs tracking-wide">
+          {{ entity.entity_type.value }}
+        </span>
+        {% if entity.is_major %}
+        <span class="text-yellow-700 text-xs font-mono-sys tracking-widest">★ MAJOR</span>
+        {% endif %}
+      </div>
+      <h1 class="font-display text-4xl md:text-5xl font-bold text-gold tracking-wide leading-tight">
+        {{ entity.name }}
+      </h1>
+      {% if entity.aliases %}
+      <div class="flex flex-wrap gap-2 mt-2">
+        {% for alias in entity.aliases %}
+        <span class="text-xs text-gray-600 bg-gray-900 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
+        {% endfor %}
+      </div>
       {% endif %}
     </div>
 
-    <div class="flex flex-wrap gap-2 mb-6">
-      <span class="px-3 py-1 rounded-full text-sm badge-{{ entity.entity_type.value }} capitalize font-medium">
-        {{ entity.entity_type.value }}
-      </span>
-      {% for alias in (entity.aliases or []) %}
-      <span class="px-3 py-1 rounded-full text-sm bg-gray-800 text-gray-400">a.k.a. {{ alias }}</span>
-      {% endfor %}
+    <!-- System AI persona block -->
+    {% if entity.persona_text %}
+    <div class="system-terminal mb-6">
+      <div class="system-terminal-header flex items-center gap-2">
+        <div class="flex gap-1">
+          <div class="w-2 h-2 rounded-full bg-yellow-900"></div>
+          <div class="w-2 h-2 rounded-full bg-yellow-900 opacity-60"></div>
+          <div class="w-2 h-2 rounded-full bg-yellow-900 opacity-30"></div>
+        </div>
+        <span class="font-mono-sys text-xs text-yellow-900 tracking-widest ml-1">
+          SYSTEM RECORD // {{ entity.entity_type.value|upper }} DATABASE // ID-{{ entity.id }}
+        </span>
+      </div>
+      <div class="system-terminal-body">
+        <p class="text-sm text-yellow-100 text-opacity-70 leading-relaxed" style="color: #d4a847; opacity: 0.85;">
+          {{ entity.persona_text }}
+        </p>
+      </div>
     </div>
-
-    {% if entity.summary %}
-    <p class="text-gray-300 leading-relaxed text-lg mb-6">{{ entity.summary }}</p>
+    {% elif entity.summary %}
+    <!-- Fallback: show extracted summary if no persona yet -->
+    <p class="text-gray-400 leading-relaxed mb-6 text-lg">{{ entity.summary }}</p>
     {% endif %}
 
     <!-- Quick facts -->
-    <div class="dungeon-card rounded-lg p-5 text-sm space-y-2">
+    <div class="dungeon-card rounded-lg p-4 text-sm mb-5 space-y-2.5">
       {% if first_book %}
-      <div class="flex gap-3">
-        <span class="text-gray-500 w-32 flex-shrink-0">First appears</span>
-        <span class="text-gray-300">
-          <em>{{ first_book.title }}</em>
-          {% if first_chapter %} — {{ first_chapter.chapter_title or 'Chapter ' ~ first_chapter.chapter_number }}{% endif %}
+      <div class="flex gap-3 items-baseline">
+        <span class="font-mono-sys text-gray-700 text-xs tracking-wide w-32 flex-shrink-0 uppercase">First Appears</span>
+        <span class="text-gray-400">
+          <em class="not-italic">{{ first_book.title }}</em>
+          {% if first_chapter %}
+          <span class="text-gray-700 mx-1">·</span>
+          {% if first_chapter.chapter_title %}
+          <span class="text-gray-500">{{ first_chapter.chapter_title }}</span>
+          {% else %}
+          <span class="text-gray-600">Ch. {{ first_chapter.chapter_number }}</span>
+          {% endif %}
+          {% endif %}
         </span>
       </div>
       {% endif %}
-      <div class="flex gap-3">
-        <span class="text-gray-500 w-32 flex-shrink-0">Total passages</span>
-        <span class="text-gray-300">
-          {% set total_p = namespace(n=0) %}
-          {% for ptype in passage_type_order %}{% if ptype in passages_by_type %}{% set total_p.n = total_p.n + passages_by_type[ptype]|length %}{% endif %}{% endfor %}
-          {{ total_p.n }}
+      <div class="flex gap-3 items-baseline">
+        <span class="font-mono-sys text-gray-700 text-xs tracking-wide w-32 flex-shrink-0 uppercase">Total Passages</span>
+        <span class="text-gray-400 tabular-nums">
+          {{ visible_count }}
+          {% if hidden_count > 0 %}
+          <span class="text-green-800 text-xs font-mono-sys ml-1">
+            ({{ hidden_count }} hidden — spoiler shield)
+          </span>
+          {% endif %}
         </span>
       </div>
       {% if passages_by_type.get('physical') %}
-      <div class="flex gap-3">
-        <span class="text-gray-500 w-32 flex-shrink-0">Physical refs</span>
-        <span class="text-gray-300">{{ passages_by_type['physical']|length }} passages</span>
+      <div class="flex gap-3 items-baseline">
+        <span class="font-mono-sys text-gray-700 text-xs tracking-wide w-32 flex-shrink-0 uppercase">Physical Refs</span>
+        <span class="text-gray-400 tabular-nums">{{ passages_by_type['physical']|length }} passages</span>
       </div>
       {% endif %}
     </div>
 
     <!-- Relationships -->
     {% if relationships %}
-    <div class="mt-6">
-      <h3 class="font-display text-sm text-gray-500 uppercase tracking-widest mb-3">Relationships</h3>
+    <div>
+      <div class="font-mono-sys text-xs text-gray-700 tracking-widest mb-2 uppercase">Known Connections</div>
       <div class="flex flex-wrap gap-2">
         {% for rel, related_entity in relationships %}
         <a href="/entity/{{ related_entity.slug }}"
-           class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 rounded-full px-3 py-1 text-sm transition">
-          <span class="text-gray-400 text-xs capitalize">{{ rel.relationship }}</span>
-          <span class="text-gray-200">{{ related_entity.name }}</span>
+           class="flex items-center gap-1.5 dungeon-card rounded-full px-3 py-1 text-xs transition hover:text-gold">
+          <span class="text-gray-700 capitalize">{{ rel.relation_type }}</span>
+          <span class="text-gray-500">·</span>
+          <span class="text-gray-300">{{ related_entity.name }}</span>
         </a>
         {% endfor %}
       </div>
     </div>
     {% endif %}
+
   </div>
 </div>
 
-<!-- Passage sections -->
-{% for ptype in passage_type_order %}
-{% if ptype in passages_by_type %}
-{% set type_passages = passages_by_type[ptype] %}
-<section class="mb-12">
-  <div class="flex items-center gap-4 mb-5">
-    <h2 class="font-display text-xl text-gold tracking-wide capitalize">
-      {% if ptype == 'physical' %}Physical Description
-      {% elif ptype == 'personality' %}Personality
-      {% elif ptype == 'backstory' %}Backstory & Origin
-      {% elif ptype == 'ability' %}Abilities & Powers
-      {% elif ptype == 'action' %}Notable Actions
-      {% else %}Other Mentions{% endif %}
-    </h2>
-    <span class="text-sm text-gray-600">{{ type_passages|length }} passage{{ 's' if type_passages|length != 1 }}</span>
-    <div class="flex-1 h-px bg-gray-800"></div>
+<!-- Spoiler shield notice (if passages are hidden) -->
+{% if hidden_count > 0 %}
+<div class="spoiler-shield rounded-lg px-5 py-3 mb-10 flex items-center gap-3 text-sm">
+  <span class="text-green-700 text-lg">🛡</span>
+  <div>
+    <span class="font-mono-sys text-green-700 text-xs tracking-widest block mb-0.5">SPOILER SHIELD ACTIVE</span>
+    <span class="text-gray-500 text-xs">
+      {{ hidden_count }} passage{{ 's' if hidden_count != 1 }} from later books are hidden.
+      <a href="/set-book?redirect_to={{ request.url.path }}" class="text-green-700 hover:text-green-500 underline underline-offset-2 transition ml-1">
+        Clear filter to see all.
+      </a>
+    </span>
   </div>
-
-  <div class="space-y-4">
-    {% for item in type_passages %}
-    {% set passage = item.passage %}
-    {% set chapter = item.chapter %}
-    {% set book = item.book %}
-    <div class="dungeon-card rounded-lg p-5 group">
-      <!-- Source citation -->
-      <div class="text-xs text-gray-600 mb-3 flex items-center gap-2">
-        <span class="text-gray-700">📖</span>
-        <em>{{ book.title }}</em>
-        <span class="text-gray-700">·</span>
-        {% if chapter.chapter_title %}
-        <a href="{{ chapter.url }}" target="_blank" rel="noopener noreferrer"
-           class="hover:text-gold transition">
-          {{ chapter.chapter_title }}
-        </a>
-        {% else %}
-        Chapter {{ chapter.chapter_number }}
-        {% endif %}
-      </div>
-
-      <!-- Context before -->
-      {% if passage.context_before %}
-      <p class="text-gray-600 text-sm italic leading-relaxed mb-2">…{{ passage.context_before }}</p>
-      {% endif %}
-
-      <!-- The passage itself -->
-      <blockquote class="border-l-2 border-yellow-700 pl-4 text-gray-200 leading-relaxed">
-        {{ passage.passage_text }}
-      </blockquote>
-
-      <!-- Context after -->
-      {% if passage.context_after %}
-      <p class="text-gray-600 text-sm italic leading-relaxed mt-2">{{ passage.context_after }}…</p>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
-</section>
+</div>
 {% endif %}
-{% endfor %}
 
-<!-- No passages -->
-{% set has_any = namespace(found=false) %}
-{% for ptype in passage_type_order %}{% if ptype in passages_by_type %}{% set has_any.found = true %}{% endif %}{% endfor %}
-{% if not has_any.found %}
-<div class="text-center py-16 text-gray-600">
-  <p>No passages extracted for this entity yet.</p>
+<!-- Passages -->
+{% set ns = namespace(has_any=false) %}
+{% for ptype in passage_type_order %}{% if ptype in passages_by_type %}{% set ns.has_any = true %}{% endif %}{% endfor %}
+
+{% if ns.has_any %}
+<div class="space-y-12">
+  {% for ptype in passage_type_order %}
+  {% if ptype in passages_by_type %}
+  {% set type_passages = passages_by_type[ptype] %}
+  <section>
+    <div class="flex items-center gap-4 mb-5">
+      <h2 class="font-display text-xl text-gold tracking-wide">
+        {% if ptype == 'physical' %}Physical Description
+        {% elif ptype == 'personality' %}Personality
+        {% elif ptype == 'backstory' %}Backstory & Origin
+        {% elif ptype == 'ability' %}Abilities & Powers
+        {% elif ptype == 'action' %}Notable Actions
+        {% else %}Other Mentions{% endif %}
+      </h2>
+      <span class="font-mono-sys text-xs text-gray-800 tabular-nums">
+        {{ type_passages|length }} passage{{ 's' if type_passages|length != 1 }}
+      </span>
+      <div class="flex-1 h-px bg-gray-900"></div>
+    </div>
+
+    <div class="space-y-4">
+      {% for item in type_passages %}
+      {% set passage = item.passage %}
+      {% set chapter = item.chapter %}
+      {% set book    = item.book %}
+      <div class="dungeon-card rounded-lg p-5">
+
+        <!-- Source citation -->
+        <div class="font-mono-sys text-xs text-gray-700 mb-3 flex flex-wrap items-center gap-1.5 tracking-wide">
+          <span class="text-gray-800">BOOK {{ book.book_number }}</span>
+          <span class="text-gray-800">·</span>
+          <em class="not-italic text-gray-700">{{ book.title }}</em>
+          <span class="text-gray-800">·</span>
+          {% if chapter.chapter_title %}
+          {% if chapter.url %}
+          <a href="{{ chapter.url }}" target="_blank" rel="noopener noreferrer"
+             class="hover:text-gold transition">{{ chapter.chapter_title }}</a>
+          {% else %}
+          <span>{{ chapter.chapter_title }}</span>
+          {% endif %}
+          {% else %}
+          <span>CH. {{ chapter.chapter_number }}</span>
+          {% endif %}
+        </div>
+
+        <!-- Context before -->
+        {% if passage.context_before %}
+        <p class="text-gray-700 text-sm italic leading-relaxed mb-2 pl-4 border-l border-gray-900">
+          …{{ passage.context_before }}
+        </p>
+        {% endif %}
+
+        <!-- The passage -->
+        <blockquote class="passage-quote">
+          {{ passage.passage_text }}
+        </blockquote>
+
+        <!-- Context after -->
+        {% if passage.context_after %}
+        <p class="text-gray-700 text-sm italic leading-relaxed mt-2 pl-4 border-l border-gray-900">
+          {{ passage.context_after }}…
+        </p>
+        {% endif %}
+
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="text-center py-20 text-gray-800">
+  <div class="font-mono-sys text-xs tracking-widest mb-2">NO PASSAGES AVAILABLE</div>
+  {% if max_book %}
+  <p class="text-xs text-gray-800">Spoiler shield may be filtering all passages. <a href="/set-book?redirect_to={{ request.url.path }}" class="text-green-900 hover:text-green-700 underline underline-offset-2">Clear filter.</a></p>
+  {% endif %}
 </div>
 {% endif %}
 
