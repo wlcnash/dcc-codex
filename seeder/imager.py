@@ -12,8 +12,8 @@ import time
 import psycopg2
 import boto3
 from botocore.config import Config
-import google.generativeai as genai
-from google.generativeai import types as genai_types
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
@@ -36,39 +36,36 @@ and all specific details mentioned. Be precise about colors, sizes, materials, a
 Max 400 words."""
 
 
-def build_image_prompt(entity_name: str, entity_type: str, passages: list[str], model) -> str:
+def build_image_prompt(entity_name: str, entity_type: str, passages: list[str], client) -> str:
     """Use Gemini Flash to synthesize a detailed image prompt from passages."""
     passages_text = "\n\n---\n\n".join(f'"{p}"' for p in passages[:10])  # cap at 10 passages
 
-    response = model.generate_content(
-        [
-            {"role": "user", "parts": [PROMPT_BUILDER_SYSTEM]},
-            {
-                "role": "user",
-                "parts": [PROMPT_BUILDER_USER.format(
-                    entity_name=entity_name,
-                    entity_type=entity_type,
-                    passages=passages_text,
-                )],
-            },
-        ]
+    prompt = f"{PROMPT_BUILDER_SYSTEM}\n\n{PROMPT_BUILDER_USER.format(entity_name=entity_name, entity_type=entity_type, passages=passages_text)}"
+
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=0.3),
     )
     return response.text.strip()
 
 
-def generate_image(prompt: str, imagen_model) -> bytes | None:
+def generate_image(prompt: str, client) -> bytes | None:
     """Call Imagen 3 to generate an image. Returns PNG bytes or None."""
     try:
-        result = imagen_model.generate_images(
+        result = client.models.generate_images(
+            model="imagen-3.0-generate-001",
             prompt=prompt,
-            number_of_images=1,
-            safety_filter_level="block_only_high",
-            aspect_ratio="1:1",
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                safety_filter_level="BLOCK_ONLY_HIGH",
+                aspect_ratio="1:1",
+            ),
         )
         time.sleep(RATE_LIMIT_SECONDS)
 
-        if result.images:
-            return result.images[0]._image_bytes
+        if result.generated_images:
+            return result.generated_images[0].image.image_bytes
         return None
     except Exception as e:
         logger.error(f"Imagen generation failed: {e}")
@@ -109,9 +106,7 @@ def run_imager(
     Main image generation loop.
     Finds entities with physical passages but no image, generates and uploads.
     """
-    genai.configure(api_key=gemini_api_key)
-    flash_model = genai.GenerativeModel("gemini-1.5-flash")
-    imagen_model = genai.ImageGenerationModel("imagen-3.0-generate-001")
+    client = genai.Client(api_key=gemini_api_key)
 
     minio_client = boto3.client(
         "s3",
@@ -165,10 +160,10 @@ def run_imager(
         logger.info(f"  Generating image for: {name}")
 
         # Build prompt from passages
-        image_prompt = build_image_prompt(name, entity_type, passages, flash_model)
+        image_prompt = build_image_prompt(name, entity_type, passages, client)
 
         # Generate image
-        image_bytes = generate_image(image_prompt, imagen_model)
+        image_bytes = generate_image(image_prompt, client)
         if image_bytes is None:
             logger.warning(f"  Skipping {name} — Imagen returned no image")
             continue
