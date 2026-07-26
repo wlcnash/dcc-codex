@@ -5,7 +5,7 @@ import os
 import logging
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
@@ -35,6 +35,47 @@ ENTITY_TYPE_LABELS = {
     "other": "Other",
 }
 
+ENTITY_TYPE_ICONS = {
+    "character": "👤",
+    "creature": "🐉",
+    "item": "⚔",
+    "location": "🗺",
+    "floor": "🏚",
+    "ability": "✨",
+    "faction": "⚑",
+    "other": "◈",
+}
+
+
+def get_max_book(request: Request) -> Optional[int]:
+    val = request.cookies.get("max_book")
+    if val and val.isdigit():
+        return int(val)
+    return None
+
+
+def get_books(db: Session):
+    return db.query(Book).order_by(Book.book_number).all()
+
+
+def base_context(request: Request, db: Session) -> dict:
+    """Shared template context included in every route."""
+    max_book = get_max_book(request)
+    books = get_books(db)
+    max_book_obj = None
+    if max_book is not None:
+        for b in books:
+            if b.book_number == max_book:
+                max_book_obj = b
+                break
+    return {
+        "request": request,
+        "books": books,
+        "max_book": max_book,
+        "max_book_obj": max_book_obj,
+        "entity_type_icons": ENTITY_TYPE_ICONS,
+    }
+
 
 def get_minio_client():
     return boto3.client(
@@ -56,12 +97,28 @@ def health():
 
 
 # ─────────────────────────────────────────────
-# Image proxy (serves from MinIO internally)
+# Book selector — sets cookie, redirects back
+# ─────────────────────────────────────────────
+
+@app.get("/set-book")
+def set_book(
+    book: Optional[int] = Query(None),
+    redirect_to: str = Query("/"),
+):
+    response = RedirectResponse(url=redirect_to, status_code=302)
+    if book is not None:
+        response.set_cookie("max_book", str(book), max_age=60 * 60 * 24 * 365, path="/")
+    else:
+        response.delete_cookie("max_book", path="/")
+    return response
+
+
+# ─────────────────────────────────────────────
+# Image proxy (MinIO internal)
 # ─────────────────────────────────────────────
 
 @app.get("/images/{slug}.png")
 def serve_image(slug: str):
-    """Proxy entity images from MinIO so they're served under the app's domain."""
     try:
         minio = get_minio_client()
         obj = minio.get_object(Bucket=IMAGE_BUCKET, Key=f"entities/{slug}.png")
@@ -77,11 +134,17 @@ def serve_image(slug: str):
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
-    # Stats for home page
+    ctx = base_context(request, db)
+    max_book = ctx["max_book"]
+
     total_entities = db.query(func.count(Entity.id)).scalar()
     total_passages = db.query(func.count(Passage.id)).scalar()
     total_chapters = db.query(func.count(Chapter.id)).scalar()
-    imaged_entities = db.query(func.count(Entity.id)).filter(Entity.image_url.isnot(None)).scalar()
+    imaged_entities = (
+        db.query(func.count(Entity.id))
+        .filter(Entity.image_url.isnot(None))
+        .scalar()
+    )
 
     type_counts = (
         db.query(Entity.entity_type, func.count(Entity.id))
@@ -90,16 +153,19 @@ def home(request: Request, db: Session = Depends(get_db)):
     )
     counts_by_type = {t.value: c for t, c in type_counts}
 
-    featured = (
+    featured_q = (
         db.query(Entity)
         .filter(Entity.is_major == True, Entity.image_url.isnot(None))
-        .order_by(func.random())
-        .limit(6)
-        .all()
     )
+    if max_book is not None:
+        featured_q = (
+            featured_q
+            .join(Book, Entity.first_book_id == Book.id)
+            .filter(Book.book_number <= max_book)
+        )
+    featured = featured_q.order_by(func.random()).limit(6).all()
 
-    return templates.TemplateResponse("home.html", {
-        "request": request,
+    ctx.update({
         "total_entities": total_entities,
         "total_passages": total_passages,
         "total_chapters": total_chapters,
@@ -108,10 +174,11 @@ def home(request: Request, db: Session = Depends(get_db)):
         "entity_type_labels": ENTITY_TYPE_LABELS,
         "featured": featured,
     })
+    return templates.TemplateResponse("home.html", ctx)
 
 
 # ─────────────────────────────────────────────
-# Entity list (browse by type, search)
+# Browse
 # ─────────────────────────────────────────────
 
 @app.get("/browse", response_class=HTMLResponse)
@@ -124,6 +191,9 @@ def browse(
     per_page: int = Query(48, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
+    ctx = base_context(request, db)
+    max_book = ctx["max_book"]
+
     query = db.query(Entity)
 
     if entity_type and entity_type in [t.value for t in EntityTypeEnum]:
@@ -140,6 +210,11 @@ def browse(
     if major_only:
         query = query.filter(Entity.is_major == True)
 
+    if max_book is not None:
+        query = query.outerjoin(Book, Entity.first_book_id == Book.id).filter(
+            or_(Entity.first_book_id == None, Book.book_number <= max_book)
+        )
+
     total = query.count()
     entities = (
         query
@@ -148,11 +223,9 @@ def browse(
         .limit(per_page)
         .all()
     )
-
     total_pages = (total + per_page - 1) // per_page
 
-    return templates.TemplateResponse("entity_list.html", {
-        "request": request,
+    ctx.update({
         "entities": entities,
         "entity_type": entity_type,
         "entity_type_labels": ENTITY_TYPE_LABELS,
@@ -163,6 +236,7 @@ def browse(
         "total": total,
         "total_pages": total_pages,
     })
+    return templates.TemplateResponse("entity_list.html", ctx)
 
 
 # ─────────────────────────────────────────────
@@ -171,21 +245,35 @@ def browse(
 
 @app.get("/entity/{slug}", response_class=HTMLResponse)
 def entity_detail(slug: str, request: Request, db: Session = Depends(get_db)):
+    ctx = base_context(request, db)
+    max_book = ctx["max_book"]
+
     entity = db.query(Entity).filter(Entity.slug == slug).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
 
-    # Get all passages, ordered by type then book/chapter
-    passages = (
+    # Total (unfiltered) passage count for "X hidden" message
+    total_passage_count = (
+        db.query(func.count(Passage.id))
+        .filter(Passage.entity_id == entity.id)
+        .scalar()
+    )
+
+    # Passages filtered by max_book
+    pq = (
         db.query(Passage, Chapter, Book)
         .join(Chapter, Passage.chapter_id == Chapter.id)
         .join(Book, Chapter.book_id == Book.id)
         .filter(Passage.entity_id == entity.id)
-        .order_by(Passage.passage_type, Book.book_number, Chapter.chapter_number)
-        .all()
     )
+    if max_book is not None:
+        pq = pq.filter(Book.book_number <= max_book)
+    passages = pq.order_by(Passage.passage_type, Book.book_number, Chapter.chapter_number).all()
 
-    # Group passages by type
+    visible_count = len(passages)
+    hidden_count = total_passage_count - visible_count
+
+    # Group by passage type
     passages_by_type: dict[str, list] = {}
     for passage, chapter, book in passages:
         ptype = passage.passage_type.value
@@ -197,7 +285,7 @@ def entity_detail(slug: str, request: Request, db: Session = Depends(get_db)):
             "book": book,
         })
 
-    # Get relationships
+    # Relationships (bidirectional)
     relationships = (
         db.query(EntityRelationship, Entity)
         .join(Entity, EntityRelationship.entity_b_id == Entity.id)
@@ -210,14 +298,11 @@ def entity_detail(slug: str, request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
-    # First and last appearance
     first_book = entity.first_book
     first_chapter = entity.first_chapter
-
     passage_type_order = ["physical", "personality", "ability", "backstory", "action", "other"]
 
-    return templates.TemplateResponse("entity_detail.html", {
-        "request": request,
+    ctx.update({
         "entity": entity,
         "passages_by_type": passages_by_type,
         "passage_type_order": passage_type_order,
@@ -225,11 +310,15 @@ def entity_detail(slug: str, request: Request, db: Session = Depends(get_db)):
         "first_book": first_book,
         "first_chapter": first_chapter,
         "entity_type_labels": ENTITY_TYPE_LABELS,
+        "hidden_count": hidden_count,
+        "visible_count": visible_count,
+        "total_passage_count": total_passage_count,
     })
+    return templates.TemplateResponse("entity_detail.html", ctx)
 
 
 # ─────────────────────────────────────────────
-# Search API (JSON, for typeahead)
+# Search API (typeahead)
 # ─────────────────────────────────────────────
 
 @app.get("/api/search")
