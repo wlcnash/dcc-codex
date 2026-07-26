@@ -124,15 +124,18 @@ def run_imager(
 
     cur = conn.cursor()
 
-    # Find entities with physical passages but no image, major entities first
+    # Find entities with physical passages but no image, major entities first.
+    # Use subquery to avoid DISTINCT + ORDER BY conflict.
     cur.execute(
         """
-        SELECT DISTINCT e.id, e.name, e.slug, e.entity_type::text
-        FROM entities e
-        JOIN passages p ON p.entity_id = e.id
-        WHERE p.passage_type = 'physical'
-          AND (e.image_url IS NULL OR e.image_url = '')
-        ORDER BY e.is_major DESC, e.id
+        SELECT id, name, slug, entity_type FROM (
+            SELECT DISTINCT ON (e.id) e.id, e.name, e.slug, e.entity_type::text, e.is_major
+            FROM entities e
+            JOIN passages p ON p.entity_id = e.id
+            WHERE p.passage_type = 'physical'
+              AND (e.image_url IS NULL OR e.image_url = '')
+        ) sub
+        ORDER BY is_major DESC, id
         LIMIT %s
         """,
         (batch_size,),
