@@ -86,7 +86,7 @@ def extract_from_chapter(chapter_text: str, client) -> Optional[dict]:
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
