@@ -86,8 +86,8 @@ class EntityRelationship(Base):
     relation_type=Column(String(100),nullable=False); evidence=Column(Text)
     chapter_id=Column(Integer,ForeignKey("chapters.id"))
     __table_args__=(UniqueConstraint("entity_a_id","entity_b_id","relation_type"),)
-    entity_a=relationship("Entity",foreign_keys="[EntityRelationship.entity_a_id]",back_populates="entity_a")
-    entity_b=relationship("Entity",foreign_keys="[EntityRelationship.entity_b_id]",back_populates="entity_b")
+    entity_a=relationship("Entity",foreign_keys="[EntityRelationship.entity_a_id]",back_populates="relationships_as_a")
+    entity_b=relationship("Entity",foreign_keys="[EntityRelationship.entity_b_id]",back_populates="relationships_as_b")
     chapter=relationship("Chapter")
 
 class PipelineRun(Base):
