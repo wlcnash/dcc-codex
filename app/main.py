@@ -117,6 +117,16 @@ def set_book(
 # Image proxy (MinIO internal)
 # ─────────────────────────────────────────────
 
+@app.get("/images/{slug}.jpg")
+def serve_image_jpg(slug: str):
+    try:
+        minio = get_minio_client()
+        obj = minio.get_object(Bucket=IMAGE_BUCKET, Key=f"entities/{slug}.jpg")
+        return StreamingResponse(obj["Body"], media_type="image/jpeg")
+    except Exception as e:
+        logger.warning(f"Image not found for {slug}: {e}")
+        raise HTTPException(status_code=404, detail="Image not found")
+
 @app.get("/images/{slug}.png")
 def serve_image(slug: str):
     try:
