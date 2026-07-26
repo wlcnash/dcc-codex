@@ -75,6 +75,7 @@ class Entity(Base):
     first_book_id = Column(Integer, ForeignKey("books.id"))
     first_chapter_id = Column(Integer, ForeignKey("chapters.id"))
     summary = Column(Text)
+    persona_text = Column(Text)  # System AI voice description
     image_url = Column(Text)
     image_prompt = Column(Text)
     image_source_passages = Column(ARRAY(Text))
@@ -120,7 +121,7 @@ class EntityRelationship(Base):
     id = Column(Integer, primary_key=True)
     entity_a_id = Column(Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
     entity_b_id = Column(Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
-    # NOTE: named relation_type (not relationship) to avoid shadowing the SQLAlchemy relationship() function
+    # NOTE: named relation_type (not relationship) to avoid shadowing SQLAlchemy relationship()
     relation_type = Column(String(100), nullable=False)
     evidence = Column(Text)
     chapter_id = Column(Integer, ForeignKey("chapters.id"))
