@@ -1,16 +1,13 @@
 """
 DCC Codex seeder — main orchestrator.
 
-Runs the full one-time pipeline:
-  1. Scrape all DCC chapters from Royal Road
-  2. Extract entities and passages with Gemini Flash
-  3. Generate images with Imagen 3 and store in MinIO
-
 Usage:
-  python main.py --step all           # full pipeline
-  python main.py --step scrape        # scrape only
-  python main.py --step extract       # extract only (chapters already scraped)
-  python main.py --step images        # images only (entities already extracted)
+  python main.py --step all           # full pipeline (scrape → extract → images → persona)
+  python main.py --step scrape        # scrape Royal Road chapters
+  python main.py --step extract       # entity/passage extraction (Gemini)
+  python main.py --step images        # Imagen 3 image generation
+  python main.py --step persona       # System AI persona text generation
+  python main.py --step migrate       # DB migrations only (idempotent)
   python main.py --step extract --batch 50  # process 50 chapters
 """
 
@@ -20,9 +17,10 @@ import os
 import sys
 import psycopg2
 
-from scraper import run_scraper
+from scraper  import run_scraper
 from extractor import run_extractor
-from imager import run_imager
+from imager   import run_imager
+from persona  import run_persona, run_migrate
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,13 +28,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("seeder")
 
-# Chapter boundaries — where each book starts (1-indexed chapter number)
-# Approximate — adjust after scraping if Royal Road numbering differs
+# Chapter boundaries (1-indexed) — where each book starts
 BOOK_BOUNDARIES = [1, 52, 107, 162, 215, 268, 321, 374]
+
+VALID_STEPS = ["all", "scrape", "extract", "images", "persona", "migrate"]
 
 
 def get_db_conn():
-    """Create PostgreSQL connection from environment variables."""
     return psycopg2.connect(
         host=os.environ["POSTGRES_HOST"],
         port=os.environ.get("POSTGRES_PORT", "5432"),
@@ -47,7 +45,7 @@ def get_db_conn():
 
 
 def apply_schema(conn):
-    """Apply schema.sql if tables don't exist yet."""
+    """Apply schema.sql if entities table doesn't exist yet."""
     schema_path = os.path.join(os.path.dirname(__file__), "..", "schema.sql")
     if not os.path.exists(schema_path):
         logger.error(f"schema.sql not found at {schema_path}")
@@ -76,7 +74,7 @@ def main():
     parser = argparse.ArgumentParser(description="DCC Codex seeder pipeline")
     parser.add_argument(
         "--step",
-        choices=["all", "scrape", "extract", "images"],
+        choices=VALID_STEPS,
         default="all",
         help="Which pipeline step to run",
     )
@@ -84,12 +82,14 @@ def main():
         "--batch",
         type=int,
         default=None,
-        help="Batch size for extraction/image steps",
+        help="Batch size (limits entities/chapters processed per run)",
     )
     args = parser.parse_args()
 
-    # Validate required env vars
-    required_env = ["POSTGRES_HOST", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "GEMINI_API_KEY"]
+    # Validate env vars
+    required_env = ["POSTGRES_HOST", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"]
+    if args.step in ("all", "extract", "images", "persona"):
+        required_env.append("GEMINI_API_KEY")
     if args.step in ("all", "images"):
         required_env += ["MINIO_ENDPOINT", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY"]
 
@@ -101,7 +101,12 @@ def main():
     conn = get_db_conn()
     apply_schema(conn)
 
-    gemini_key = os.environ["GEMINI_API_KEY"]
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    batch = args.batch or 999999
+
+    if args.step == "migrate":
+        logger.info("=== Running migrations ===")
+        run_migrate(conn)
 
     if args.step in ("all", "scrape"):
         logger.info("=== STEP 1: Scraping Royal Road ===")
@@ -110,13 +115,11 @@ def main():
 
     if args.step in ("all", "extract"):
         logger.info("=== STEP 2: Extracting entities with Gemini ===")
-        batch = args.batch or 999999  # process all if no batch specified
         count = run_extractor(conn, gemini_key, batch_size=batch)
         logger.info(f"Extracted {count} entity references.")
 
     if args.step in ("all", "images"):
         logger.info("=== STEP 3: Generating images with Imagen 3 ===")
-        batch = args.batch or 999999
         count = run_imager(
             conn,
             gemini_key,
@@ -126,6 +129,11 @@ def main():
             batch_size=batch,
         )
         logger.info(f"Generated {count} images.")
+
+    if args.step in ("all", "persona"):
+        logger.info("=== STEP 4: Generating System AI persona text ===")
+        count = run_persona(conn, gemini_key, batch_size=batch)
+        logger.info(f"Generated {count} persona entries.")
 
     conn.close()
     logger.info("=== Pipeline complete ===")
