@@ -114,13 +114,13 @@
 <body class="text-gray-200 min-h-screen">
 
   <!-- Spoiler shield banner -->
-  {% if max_book %}
+  {% if max_floor %}
   <div class="spoiler-shield px-4 py-2 text-center text-xs text-green-400 font-mono-sys tracking-wide">
     <span class="text-green-600">■</span>
     SPOILER SHIELD ACTIVE — Showing content through
-    <strong class="text-green-300">Book {{ max_book }}{% if max_book_obj %}: {{ max_book_obj.title }}{% endif %}</strong>
+    <strong class="text-green-300">Floor {{ max_floor }}</strong>
     <span class="text-green-700 mx-2">·</span>
-    <a href="/set-book?redirect_to={{ request.url.path }}" class="text-green-600 hover:text-green-400 underline underline-offset-2 transition">
+    <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-green-600 hover:text-green-400 underline underline-offset-2 transition">
       Clear filter
     </a>
   </div>
@@ -144,18 +144,18 @@
         <a href="/browse?entity_type=location" class="text-gray-500 hover:text-gold transition hidden lg:inline">Locations</a>
       </div>
 
-      <!-- Book selector -->
+      <!-- Floor selector -->
       <div class="flex items-center gap-2 flex-shrink-0">
-        <span class="text-gray-700 text-xs font-mono-sys hidden sm:inline">READING:</span>
+        <span class="text-gray-700 text-xs font-mono-sys hidden sm:inline">FLOOR:</span>
         <select
-          id="book-selector"
+          id="floor-selector"
           class="book-select bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-400 py-1 pl-2 focus:outline-none focus:border-yellow-800 cursor-pointer transition"
         >
-          <option value="" class="bg-gray-900">All Books</option>
-          {% for book in books %}
-          <option value="{{ book.book_number }}" class="bg-gray-900"
-            {% if max_book == book.book_number %}selected{% endif %}>
-            Book {{ book.book_number }}{% if max_book == book.book_number %}: {{ book.title[:28] }}{% endif %}
+          <option value="" class="bg-gray-900">All Floors</option>
+          {% for floor in floors %}
+          <option value="{{ floor.floor_number }}" class="bg-gray-900"
+            {% if max_floor == floor.floor_number %}selected{% endif %}>
+            Floor {{ floor.floor_number }}
           </option>
           {% endfor %}
         </select>
@@ -189,13 +189,13 @@
   </footer>
 
   <script>
-    // ── Book selector ──────────────────────────────────────────────
-    document.getElementById('book-selector')?.addEventListener('change', function () {
+    // ── Floor selector ─────────────────────────────────────────────
+    document.getElementById('floor-selector')?.addEventListener('change', function () {
       const val = this.value;
       const here = encodeURIComponent(location.pathname + location.search);
       location.href = val
-        ? `/set-book?book=${val}&redirect_to=${here}`
-        : `/set-book?redirect_to=${here}`;
+        ? `/set-floor?floor=${val}&redirect_to=${here}`
+        : `/set-floor?redirect_to=${here}`;
     });
 
     // ── Typeahead search ───────────────────────────────────────────
