@@ -53,6 +53,11 @@
         <span class="px-3 py-1 rounded badge-{{ entity.entity_type.value }} capitalize font-mono-sys text-xs tracking-wide">
           {{ entity.entity_type.value }}
         </span>
+        {% if entity.species %}
+        <span class="px-3 py-1 rounded bg-teal-950 text-teal-400 font-mono-sys text-xs tracking-wide" title="{{ entity.species.description }}">
+          {{ entity.species.name }}
+        </span>
+        {% endif %}
         {% if entity.is_major %}
         <span class="text-yellow-700 text-xs font-mono-sys tracking-widest">★ MAJOR</span>
         {% endif %}
