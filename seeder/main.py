@@ -21,6 +21,7 @@ from scraper  import run_scraper
 from extractor import run_extractor
 from imager   import run_imager
 from persona  import run_persona, run_migrate
+from permanence import run_classify
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,7 +32,7 @@ logger = logging.getLogger("seeder")
 # Chapter boundaries (1-indexed) — where each book starts
 BOOK_BOUNDARIES = [1, 52, 107, 162, 215, 268, 321, 374]
 
-VALID_STEPS = ["all", "scrape", "extract", "images", "persona", "migrate"]
+VALID_STEPS = ["all", "scrape", "extract", "classify", "images", "persona", "migrate"]
 
 
 def get_db_conn():
@@ -88,7 +89,7 @@ def main():
 
     # Validate env vars
     required_env = ["POSTGRES_HOST", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"]
-    if args.step in ("all", "extract", "images", "persona"):
+    if args.step in ("all", "extract", "classify", "images", "persona"):
         required_env.append("GEMINI_API_KEY")
     if args.step in ("all", "images"):
         required_env += ["MINIO_ENDPOINT", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY"]
@@ -117,6 +118,11 @@ def main():
         logger.info("=== STEP 2: Extracting entities with Gemini ===")
         count = run_extractor(conn, gemini_key, batch_size=batch)
         logger.info(f"Extracted {count} entity references.")
+
+    if args.step in ("all", "classify"):
+        logger.info("=== STEP 2b: Classifying physical passages as durable/transient ===")
+        count = run_classify(conn, gemini_key, batch_size=batch)
+        logger.info(f"Classified {count} passages.")
 
     if args.step in ("all", "images"):
         logger.info("=== STEP 3: Generating images with Imagen 3 ===")

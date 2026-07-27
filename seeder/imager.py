@@ -7,31 +7,38 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 IMAGE_BUCKET = "dcc-codex"
 RATE_LIMIT_SECONDS = 3.0
+TRANSIENT_RECENT_LIMIT = 3
 
 PROMPT_BUILDER_SYSTEM = (
     "You are creating image generation prompts for a Dungeon Crawler Carl compendium. "
-    "Base prompts ONLY on the author exact descriptions from the specified book. "
+    "Base prompts ONLY on the author exact descriptions provided. "
     "Do not add details not present in the source text. Keep the dungeon aesthetic: gritty, alien, dangerous. "
+    "The passages below represent the character's CUMULATIVE appearance as of the END of the specified book: "
+    "DURABLE TRAITS are established, ongoing features (build, hair, gear kept over time) that still apply. "
+    "CURRENT STATE are the most recent transient details (wounds, dirt, temporary effects) at that point in the story. "
+    "Combine both into one coherent, internally-consistent appearance. If CURRENT STATE contradicts an earlier "
+    "DURABLE detail (e.g. a wound has healed), prefer CURRENT STATE. "
     "Return ONLY the image prompt text, nothing else."
 )
 
 PROMPT_BUILDER_USER = (
-    'Based on these exact passages from "{book_title}" (Book {book_number}), '
-    "create an image generation prompt for: {entity_name} ({entity_type})\n\n"
-    "PASSAGES FROM THIS BOOK:\n{passages}\n\n"
-    "Create a single detailed image prompt capturing the appearance described in THIS book specifically. "
-    "The entity may look different in other books -- use only what is above. "
+    'Based on these exact passages describing "{entity_name}" ({entity_type}) as of the end of '
+    '"{book_title}" (Book {book_number}):\n\n'
+    "DURABLE TRAITS (established, still apply):\n{durable_text}\n\n"
+    "CURRENT STATE (most recent, near end of this book):\n{transient_text}\n\n"
+    "Create a single detailed image prompt capturing his cumulative appearance as of the end of this book. "
     "Include: visual style (dark fantasy illustration), dungeon torchlight lighting, "
-    "and all specific details mentioned: colors, sizes, materials, anatomy. Max 400 words."
+    "and all specific details mentioned: colors, sizes, materials, anatomy, gear."
 )
 
 
-def build_image_prompt(entity_name, entity_type, passages, book_title, book_number, client):
+def build_image_prompt(entity_name, entity_type, durable_passages, transient_passages, book_title, book_number, client):
     sep = "\n\n---\n\n"
-    passages_text = sep.join('"' + p + '"' for p in passages[:10])
+    durable_text = sep.join('"' + p + '"' for p in durable_passages) if durable_passages else "(none established yet)"
+    transient_text = sep.join('"' + p + '"' for p in transient_passages) if transient_passages else "(no notable current condition)"
     prompt = PROMPT_BUILDER_SYSTEM + "\n\n" + PROMPT_BUILDER_USER.format(
-        entity_name=entity_name, entity_type=entity_type, passages=passages_text,
-        book_title=book_title, book_number=book_number,
+        entity_name=entity_name, entity_type=entity_type, durable_text=durable_text,
+        transient_text=transient_text, book_title=book_title, book_number=book_number,
     )
     response = client.models.generate_content(
         model="gemini-3.6-flash",
@@ -93,6 +100,64 @@ def log_run_finish(conn, run_id, processed, failed, error=None):
     cur.close()
 
 
+def _fetch_passages(conn, entity_id, book_id, book_number):
+    """Return (durable_passages, transient_passages) for an entity as of the end of book_number.
+
+    Durable: ALL classified-durable physical passages from book 1 through book_number (cumulative,
+    uncapped -- this is finite, static source material, no reason to truncate it).
+    Transient: the most recent classified-transient physical passages from THIS book only, representing
+    the character's current condition near the end of the book (capped small on purpose -- this is meant
+    to be a snapshot of 'right now', not an accumulation of every scrape and bruise across the whole book).
+    If this entity's physical passages haven't been classified yet (is_durable IS NULL for all of them),
+    fall back to the old behavior: every physical passage in this book, uncapped.
+    """
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT COUNT(*) FROM passages WHERE entity_id=%s AND passage_type='physical' AND is_durable IS NOT NULL",
+        (entity_id,),
+    )
+    is_classified = cur.fetchone()[0] > 0
+    cur.close()
+
+    if not is_classified:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT p.passage_text FROM passages p
+            JOIN chapters c ON c.id = p.chapter_id
+            WHERE p.entity_id = %s AND c.book_id = %s AND p.passage_type = 'physical'
+            ORDER BY p.id
+        """, (entity_id, book_id))
+        all_text = [row[0] for row in cur.fetchall()]
+        cur.close()
+        return all_text, []
+
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT p.passage_text FROM passages p
+        JOIN chapters c ON c.id = p.chapter_id
+        JOIN books b2 ON b2.id = c.book_id
+        WHERE p.entity_id = %s AND p.passage_type = 'physical' AND p.is_durable = TRUE
+          AND b2.book_number <= %s
+        ORDER BY b2.book_number, c.chapter_number, p.id
+    """, (entity_id, book_number))
+    durable = [row[0] for row in cur.fetchall()]
+    cur.close()
+
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT p.passage_text FROM passages p
+        JOIN chapters c ON c.id = p.chapter_id
+        WHERE p.entity_id = %s AND c.book_id = %s AND p.passage_type = 'physical' AND p.is_durable = FALSE
+        ORDER BY c.chapter_number DESC, p.id DESC
+        LIMIT %s
+    """, (entity_id, book_id, TRANSIENT_RECENT_LIMIT))
+    transient = [row[0] for row in cur.fetchall()]
+    transient.reverse()
+    cur.close()
+
+    return durable, transient
+
+
 def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_secret_key, batch_size=20):
     """
     Generate per-book images for entities.
@@ -138,23 +203,15 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
     failed = 0
 
     for entity_id, name, slug, entity_type, is_major, book_id, book_number, book_title in targets:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT p.passage_text FROM passages p
-            JOIN chapters c ON c.id = p.chapter_id
-            WHERE p.entity_id = %s AND c.book_id = %s AND p.passage_type = 'physical'
-            ORDER BY p.id
-        """, (entity_id, book_id))
-        passages = [row[0] for row in cur.fetchall()]
-        cur.close()
+        durable, transient = _fetch_passages(conn, entity_id, book_id, book_number)
 
-        if not passages:
+        if not durable and not transient:
             continue
 
-        logger.info("  [Book %d] %s (%d passages)", book_number, name, len(passages))
+        logger.info("  [Book %d] %s (%d durable, %d current-state passages)", book_number, name, len(durable), len(transient))
 
         try:
-            image_prompt = build_image_prompt(name, entity_type, passages, book_title, book_number, client)
+            image_prompt = build_image_prompt(name, entity_type, durable, transient, book_title, book_number, client)
         except Exception as e:
             logger.warning("  Prompt failed for %s book %d: %s", name, book_number, e)
             failed += 1
@@ -173,6 +230,7 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
             failed += 1
             continue
 
+        all_passages = durable + transient
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO entity_appearances (entity_id, book_id, image_url, image_prompt, image_source_passages)
@@ -181,7 +239,7 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
                 image_url = EXCLUDED.image_url,
                 image_prompt = EXCLUDED.image_prompt,
                 image_source_passages = EXCLUDED.image_source_passages
-        """, (entity_id, book_id, image_url, image_prompt, passages[:5]))
+        """, (entity_id, book_id, image_url, image_prompt, all_passages))
         cur.execute("""
             UPDATE entities SET image_url=%s, image_prompt=%s, image_source_passages=%s
             WHERE id=%s AND (image_url IS NULL OR NOT EXISTS (
@@ -189,7 +247,7 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
                 JOIN books b2 ON b2.id=ea2.book_id
                 WHERE ea2.entity_id=%s AND b2.book_number>%s
             ))
-        """, (image_url, image_prompt, passages[:5], entity_id, entity_id, book_number))
+        """, (image_url, image_prompt, all_passages, entity_id, entity_id, book_number))
         conn.commit()
         cur.close()
         generated += 1
