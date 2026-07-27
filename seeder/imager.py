@@ -12,13 +12,13 @@ MAX_IMAGE_ATTEMPTS = 3
 
 PROMPT_BUILDER_SYSTEM = (
     "You are creating image generation prompts for a Dungeon Crawler Carl compendium. "
-    "Base prompts ONLY on the author exact descriptions from the specified book. "
+    "Base prompts ONLY on the author exact descriptions from the specified floor. "
     "Do not add details not present in the source text. Keep the dungeon aesthetic: gritty, alien, dangerous. "
     "Return ONLY the image prompt text, nothing else."
 )
 
 PROMPT_BUILDER_USER = (
-    'Based on these exact passages from "{book_title}" (Book {book_number}), '
+    'Based on these exact passages from the story up through Floor {floor_number}, '
     "create an image generation prompt for: {entity_name} ({entity_type})\n\n"
     "PASSAGES, in story order (earlier passages first, most recent last). If two passages describe the "
     "same thing differently (e.g. footwear, an item he's carrying, an injury), the LATER passage in this "
@@ -34,7 +34,7 @@ PROMPT_BUILDER_USER = (
     "hair color/length/style, eye color, facial hair, skin tone detail, specific facial features), do NOT invent "
     "or state a specific value for it. Leave it out of the prompt entirely rather than guessing. It is far better "
     "for the illustration to render an unremarkable, generic default for an unmentioned attribute than for this "
-    "prompt to assert a specific detail the source text never established. Only when a future book's passages "
+    "prompt to assert a specific detail the source text never established. Only when a future floor's passages "
     "describe that attribute should it ever appear in a prompt."
 )
 
@@ -55,13 +55,13 @@ VERIFY_SYSTEM = (
 )
 
 
-def build_image_prompt(entity_name, entity_type, durable_passages, transient_passages, book_title, book_number, client):
+def build_image_prompt(entity_name, entity_type, durable_passages, transient_passages, floor_number, client):
     sep = "\n\n---\n\n"
     all_passages = durable_passages + transient_passages
     passages_text = sep.join('"' + p + '"' for p in all_passages) if all_passages else "(no passages available)"
     prompt = PROMPT_BUILDER_SYSTEM + "\n\n" + PROMPT_BUILDER_USER.format(
         entity_name=entity_name, entity_type=entity_type, passages=passages_text,
-        book_title=book_title, book_number=book_number,
+        floor_number=floor_number,
     )
     response = client.models.generate_content(
         model="gemini-3.6-flash",
@@ -155,8 +155,8 @@ def generate_and_verify_image(prompt, client, max_attempts=MAX_IMAGE_ATTEMPTS):
     return last_image_bytes, current_prompt, verification_log
 
 
-def upload_to_minio(minio_client, slug, book_id, image_bytes):
-    key = "entities/{}/book_{}.jpg".format(slug, book_id)
+def upload_to_minio(minio_client, slug, floor_number, image_bytes):
+    key = "entities/{}/floor_{}.jpg".format(slug, floor_number)
     minio_client.put_object(Bucket=IMAGE_BUCKET, Key=key, Body=io.BytesIO(image_bytes), ContentType="image/jpeg")
     return "/images/{}.jpg".format(slug)
 
@@ -199,16 +199,19 @@ def log_run_finish(conn, run_id, processed, failed, error=None):
     cur.close()
 
 
-def _fetch_passages(conn, entity_id, book_id, book_number):
-    """Return (durable_passages, transient_passages) for an entity as of the end of book_number.
+def _fetch_passages(conn, entity_id, floor_id, floor_number):
+    """Return (durable_passages, transient_passages) for an entity as of the end of floor_number.
 
-    Durable: ALL classified-durable physical passages from book 1 through book_number (cumulative,
+    Uses the `chapter_floors` view (chapter -> nearest floor whose start_chapter_id <= it) to map every
+    passage's chapter to a floor, replacing the old book-keyed join.
+
+    Durable: ALL classified-durable physical passages through the end of floor_number (cumulative,
     uncapped -- this is finite, static source material, no reason to truncate it).
-    Transient: the most recent classified-transient physical passages from THIS book only, representing
-    the character's current condition near the end of the book (capped small on purpose -- this is meant
-    to be a snapshot of 'right now', not an accumulation of every scrape and bruise across the whole book).
+    Transient: the most recent classified-transient physical passages from THIS floor only, representing
+    the character's current condition near the end of the floor (capped small on purpose -- this is meant
+    to be a snapshot of 'right now', not an accumulation of every scrape and bruise across the whole floor).
     If this entity's physical passages haven't been classified yet (is_durable IS NULL for all of them),
-    fall back to the old behavior: every physical passage in this book, uncapped.
+    fall back to the old behavior: every physical passage in this floor, uncapped.
     """
     cur = conn.cursor()
     cur.execute(
@@ -222,10 +225,10 @@ def _fetch_passages(conn, entity_id, book_id, book_number):
         cur = conn.cursor()
         cur.execute("""
             SELECT p.passage_text FROM passages p
-            JOIN chapters c ON c.id = p.chapter_id
-            WHERE p.entity_id = %s AND c.book_id = %s AND p.passage_type = 'physical'
+            JOIN chapter_floors cf ON cf.chapter_id = p.chapter_id
+            WHERE p.entity_id = %s AND cf.floor_id = %s AND p.passage_type = 'physical'
             ORDER BY p.id
-        """, (entity_id, book_id))
+        """, (entity_id, floor_id))
         all_text = [row[0] for row in cur.fetchall()]
         cur.close()
         return all_text, []
@@ -233,23 +236,22 @@ def _fetch_passages(conn, entity_id, book_id, book_number):
     cur = conn.cursor()
     cur.execute("""
         SELECT p.passage_text FROM passages p
-        JOIN chapters c ON c.id = p.chapter_id
-        JOIN books b2 ON b2.id = c.book_id
+        JOIN chapter_floors cf ON cf.chapter_id = p.chapter_id
         WHERE p.entity_id = %s AND p.passage_type = 'physical' AND p.is_durable = TRUE
-          AND b2.book_number <= %s
-        ORDER BY b2.book_number, c.chapter_number, p.id
-    """, (entity_id, book_number))
+          AND cf.floor_number <= %s
+        ORDER BY cf.floor_number, p.chapter_id, p.id
+    """, (entity_id, floor_number))
     durable = [row[0] for row in cur.fetchall()]
     cur.close()
 
     cur = conn.cursor()
     cur.execute("""
         SELECT p.passage_text FROM passages p
-        JOIN chapters c ON c.id = p.chapter_id
-        WHERE p.entity_id = %s AND c.book_id = %s AND p.passage_type = 'physical' AND p.is_durable = FALSE
-        ORDER BY c.chapter_number DESC, p.id DESC
+        JOIN chapter_floors cf ON cf.chapter_id = p.chapter_id
+        WHERE p.entity_id = %s AND cf.floor_id = %s AND p.passage_type = 'physical' AND p.is_durable = FALSE
+        ORDER BY p.chapter_id DESC, p.id DESC
         LIMIT %s
-    """, (entity_id, book_id, TRANSIENT_RECENT_LIMIT))
+    """, (entity_id, floor_id, TRANSIENT_RECENT_LIMIT))
     transient = [row[0] for row in cur.fetchall()]
     transient.reverse()
     cur.close()
@@ -259,9 +261,10 @@ def _fetch_passages(conn, entity_id, book_id, book_number):
 
 def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_secret_key, batch_size=20):
     """
-    Generate per-book images for entities.
-    One image per (entity, book) pair where physical passages exist.
-    Stores in entity_appearances; also keeps entities.image_url updated for backward compat.
+    Generate per-floor images for entities.
+    One image per (entity, floor) pair where physical passages exist.
+    Stores in entity_appearances (keyed on floor_id, with book_id carried along from the floor's
+    starting book for display/legacy purposes); also keeps entities.image_url updated for backward compat.
     Every generated image is checked against its own prompt by a second vision model call before being
     accepted; images that add unsourced objects (most commonly weapons) get up to MAX_IMAGE_ATTEMPTS
     retries with an explicit correction appended. The full verification history is stored per appearance
@@ -279,65 +282,65 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
 
     cur = conn.cursor()
     cur.execute("""
-        SELECT DISTINCT ON (e.id, b.id)
+        SELECT DISTINCT ON (e.id, f.id)
                e.id, e.name, e.slug, e.entity_type::text, e.is_major,
-               b.id AS book_id, b.book_number, b.title AS book_title
+               f.id AS floor_id, f.floor_number, f.book_id
         FROM entities e
         JOIN passages p  ON p.entity_id  = e.id
-        JOIN chapters c  ON c.id         = p.chapter_id
-        JOIN books b     ON b.id         = c.book_id
+        JOIN chapter_floors cf ON cf.chapter_id = p.chapter_id
+        JOIN floors f    ON f.id         = cf.floor_id
         WHERE p.passage_type = 'physical'
           AND NOT EXISTS (
               SELECT 1 FROM entity_appearances ea
-              WHERE ea.entity_id = e.id AND ea.book_id = b.id
+              WHERE ea.entity_id = e.id AND ea.floor_id = f.id
           )
-        ORDER BY e.id, b.id, e.is_major DESC
+        ORDER BY e.id, f.id, e.is_major DESC
         LIMIT %s
     """, (batch_size,))
     targets = cur.fetchall()
     cur.close()
 
     if not targets:
-        logger.info("No (entity, book) pairs need images.")
+        logger.info("No (entity, floor) pairs need images.")
         log_run_finish(conn, run_id, 0, 0)
         return 0
 
-    logger.info("Generating per-book images for %d (entity, book) pairs...", len(targets))
+    logger.info("Generating per-floor images for %d (entity, floor) pairs...", len(targets))
     generated = 0
     failed = 0
     flagged = 0
 
-    for entity_id, name, slug, entity_type, is_major, book_id, book_number, book_title in targets:
-        durable, transient = _fetch_passages(conn, entity_id, book_id, book_number)
+    for entity_id, name, slug, entity_type, is_major, floor_id, floor_number, book_id in targets:
+        durable, transient = _fetch_passages(conn, entity_id, floor_id, floor_number)
 
         if not durable and not transient:
             continue
 
-        logger.info("  [Book %d] %s (%d durable, %d current-state passages)", book_number, name, len(durable), len(transient))
+        logger.info("  [Floor %d] %s (%d durable, %d current-state passages)", floor_number, name, len(durable), len(transient))
 
         try:
-            image_prompt = build_image_prompt(name, entity_type, durable, transient, book_title, book_number, client)
+            image_prompt = build_image_prompt(name, entity_type, durable, transient, floor_number, client)
         except Exception as e:
-            logger.warning("  Prompt failed for %s book %d: %s", name, book_number, e)
+            logger.warning("  Prompt failed for %s floor %d: %s", name, floor_number, e)
             failed += 1
             continue
 
         image_bytes, final_prompt, verification_log = generate_and_verify_image(image_prompt, client)
         if image_bytes is None:
-            logger.warning("  No image for %s book %d", name, book_number)
+            logger.warning("  No image for %s floor %d", name, floor_number)
             failed += 1
             continue
 
         verification_passed = verification_log[-1]["passed"] if verification_log else None
         if not verification_passed:
             flagged += 1
-            logger.warning("  %s book %d PUBLISHED WITH FLAG -- unresolved unsourced objects: %s",
-                            name, book_number, verification_log[-1].get("unsourced_objects"))
+            logger.warning("  %s floor %d PUBLISHED WITH FLAG -- unresolved unsourced objects: %s",
+                            name, floor_number, verification_log[-1].get("unsourced_objects"))
 
         try:
-            image_url = upload_to_minio(minio_client, slug, book_id, image_bytes)
+            image_url = upload_to_minio(minio_client, slug, floor_number, image_bytes)
         except Exception as e:
-            logger.warning("  MinIO upload failed for %s book %d: %s", name, book_number, e)
+            logger.warning("  MinIO upload failed for %s floor %d: %s", name, floor_number, e)
             failed += 1
             continue
 
@@ -345,27 +348,27 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO entity_appearances
-                (entity_id, book_id, image_url, image_prompt, image_source_passages, verification_passed, verification_log)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (entity_id, book_id) DO UPDATE SET
+                (entity_id, book_id, floor_id, image_url, image_prompt, image_source_passages, verification_passed, verification_log)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (entity_id, floor_id) DO UPDATE SET
                 image_url = EXCLUDED.image_url,
                 image_prompt = EXCLUDED.image_prompt,
                 image_source_passages = EXCLUDED.image_source_passages,
                 verification_passed = EXCLUDED.verification_passed,
                 verification_log = EXCLUDED.verification_log
-        """, (entity_id, book_id, image_url, final_prompt, all_passages, verification_passed, json.dumps(verification_log)))
+        """, (entity_id, book_id, floor_id, image_url, final_prompt, all_passages, verification_passed, json.dumps(verification_log)))
         cur.execute("""
             UPDATE entities SET image_url=%s, image_prompt=%s, image_source_passages=%s
             WHERE id=%s AND (image_url IS NULL OR NOT EXISTS (
                 SELECT 1 FROM entity_appearances ea2
-                JOIN books b2 ON b2.id=ea2.book_id
-                WHERE ea2.entity_id=%s AND b2.book_number>%s
+                JOIN floors f2 ON f2.id=ea2.floor_id
+                WHERE ea2.entity_id=%s AND f2.floor_number>%s
             ))
-        """, (image_url, final_prompt, all_passages, entity_id, entity_id, book_number))
+        """, (image_url, final_prompt, all_passages, entity_id, entity_id, floor_number))
         conn.commit()
         cur.close()
         generated += 1
-        logger.info("  OK %s (book %d) -> %s (verified=%s)", name, book_number, image_url, verification_passed)
+        logger.info("  OK %s (floor %d) -> %s (verified=%s)", name, floor_number, image_url, verification_passed)
 
     log_run_finish(conn, run_id, generated, failed)
     logger.info("Done. %d generated, %d failed, %d published with unresolved verification flags.", generated, failed, flagged)
