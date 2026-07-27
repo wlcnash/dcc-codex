@@ -60,7 +60,7 @@ def generate_image(prompt, client):
 def upload_to_minio(minio_client, slug, book_id, image_bytes):
     key = "entities/{}/book_{}.jpg".format(slug, book_id)
     minio_client.put_object(Bucket=IMAGE_BUCKET, Key=key, Body=io.BytesIO(image_bytes), ContentType="image/jpeg")
-    return "/images/{}/book/{}".format(slug, book_id)
+    return "/images/{}.jpg".format(slug)
 
 
 def ensure_bucket(minio_client):
