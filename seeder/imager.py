@@ -11,34 +11,31 @@ TRANSIENT_RECENT_LIMIT = 3
 
 PROMPT_BUILDER_SYSTEM = (
     "You are creating image generation prompts for a Dungeon Crawler Carl compendium. "
-    "Base prompts ONLY on the author exact descriptions provided. "
+    "Base prompts ONLY on the author exact descriptions from the specified book. "
     "Do not add details not present in the source text. Keep the dungeon aesthetic: gritty, alien, dangerous. "
-    "The passages below represent the character's CUMULATIVE appearance as of the END of the specified book: "
-    "DURABLE TRAITS are established, ongoing features (build, hair, gear kept over time) that still apply. "
-    "CURRENT STATE are the most recent transient details (wounds, dirt, temporary effects) at that point in the story. "
-    "Combine both into one coherent, internally-consistent appearance. If CURRENT STATE contradicts an earlier "
-    "DURABLE detail (e.g. a wound has healed), prefer CURRENT STATE. "
     "Return ONLY the image prompt text, nothing else."
 )
 
 PROMPT_BUILDER_USER = (
-    'Based on these exact passages describing "{entity_name}" ({entity_type}) as of the end of '
-    '"{book_title}" (Book {book_number}):\n\n'
-    "DURABLE TRAITS (established, still apply):\n{durable_text}\n\n"
-    "CURRENT STATE (most recent, near end of this book):\n{transient_text}\n\n"
-    "Create a single detailed image prompt capturing his cumulative appearance as of the end of this book. "
+    'Based on these exact passages from "{book_title}" (Book {book_number}), '
+    "create an image generation prompt for: {entity_name} ({entity_type})\n\n"
+    "PASSAGES, in story order (earlier passages first, most recent last). If two passages describe the "
+    "same thing differently (e.g. footwear, an item he's carrying, an injury), the LATER passage in this "
+    "list is what's currently true — use that one and ignore the earlier, superseded detail:\n{passages}\n\n"
+    "Create a single detailed image prompt capturing the appearance described above, resolved to his current, "
+    "present-day state. "
     "Include: visual style (dark fantasy illustration), dungeon torchlight lighting, "
-    "and all specific details mentioned: colors, sizes, materials, anatomy, gear."
+    "and all specific details mentioned: colors, sizes, materials, anatomy. Max 400 words."
 )
 
 
 def build_image_prompt(entity_name, entity_type, durable_passages, transient_passages, book_title, book_number, client):
     sep = "\n\n---\n\n"
-    durable_text = sep.join('"' + p + '"' for p in durable_passages) if durable_passages else "(none established yet)"
-    transient_text = sep.join('"' + p + '"' for p in transient_passages) if transient_passages else "(no notable current condition)"
+    all_passages = durable_passages + transient_passages
+    passages_text = sep.join('"' + p + '"' for p in all_passages) if all_passages else "(no passages available)"
     prompt = PROMPT_BUILDER_SYSTEM + "\n\n" + PROMPT_BUILDER_USER.format(
-        entity_name=entity_name, entity_type=entity_type, durable_text=durable_text,
-        transient_text=transient_text, book_title=book_title, book_number=book_number,
+        entity_name=entity_name, entity_type=entity_type, passages=passages_text,
+        book_title=book_title, book_number=book_number,
     )
     response = client.models.generate_content(
         model="gemini-3.6-flash",
