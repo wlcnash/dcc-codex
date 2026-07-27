@@ -8,7 +8,7 @@ class Base(DeclarativeBase):
     pass
 
 class EntityTypeEnum(str, enum.Enum):
-    crawler="crawler"; npc="npc"; mob="mob"; species="species"; item="item"; location="location"
+    crawler="crawler"; npc="npc"; mob="mob"; item="item"; location="location"
     floor="floor"; ability="ability"; faction="faction"; deity="deity"; media="media"; other="other"
 
 class PassageTypeEnum(str, enum.Enum):
@@ -34,18 +34,27 @@ class Chapter(Base):
     book=relationship("Book",back_populates="chapters")
     passages=relationship("Passage",back_populates="chapter")
 
+class Species(Base):
+    __tablename__="species"
+    id=Column(Integer,primary_key=True); name=Column(String(255),nullable=False)
+    slug=Column(String(255),nullable=False,unique=True); description=Column(Text)
+    created_at=Column(DateTime,default=datetime.utcnow)
+    members=relationship("Entity",back_populates="species")
+
 class Entity(Base):
     __tablename__="entities"
     id=Column(Integer,primary_key=True); name=Column(String(255),nullable=False,unique=True)
     slug=Column(String(255),nullable=False,unique=True)
     entity_type=Column(Enum(EntityTypeEnum,name="entity_type"),nullable=False)
     aliases=Column(ARRAY(Text)); first_book_id=Column(Integer,ForeignKey("books.id"))
+    species_id=Column(Integer,ForeignKey("species.id"))
     first_chapter_id=Column(Integer,ForeignKey("chapters.id")); summary=Column(Text)
     persona_text=Column(Text); image_url=Column(Text); image_prompt=Column(Text)
     image_source_passages=Column(ARRAY(Text)); is_major=Column(Boolean,default=False)
     created_at=Column(DateTime,default=datetime.utcnow)
     updated_at=Column(DateTime,default=datetime.utcnow,onupdate=datetime.utcnow)
     first_book=relationship("Book",foreign_keys=[first_book_id])
+    species=relationship("Species",back_populates="members")
     first_chapter=relationship("Chapter",foreign_keys=[first_chapter_id])
     passages=relationship("Passage",back_populates="entity")
     appearances=relationship("EntityAppearance",back_populates="entity",order_by="EntityAppearance.book_id")
