@@ -13,9 +13,9 @@
     <span class="text-lg text-gray-700 font-normal ml-3 font-mono-sys">{{ total }}</span>
     {% endif %}
   </h1>
-  {% if max_book %}
+  {% if max_floor %}
   <span class="font-mono-sys text-xs text-green-700 tracking-wide">
-    ■ Filtered through Book {{ max_book }}
+    ■ Filtered through Floor {{ max_floor }}
   </span>
   {% endif %}
 </div>
@@ -61,10 +61,10 @@
 </form>
 
 <!-- Spoiler notice -->
-{% if max_book and total == 0 %}
+{% if max_floor and total == 0 %}
 <div class="spoiler-shield rounded-lg px-5 py-4 mb-8 text-sm">
   <span class="text-green-700 font-mono-sys text-xs tracking-widest block mb-1">SPOILER SHIELD ACTIVE</span>
-  No entities found for Book{{ max_book }} and earlier. The dungeon may hold more secrets in later volumes.
+  No entities found for Floor {{ max_floor }} and earlier. The dungeon may hold more secrets in later floors.
 </div>
 {% endif %}
 
@@ -113,7 +113,7 @@
 </div>
 {% endif %}
 
-{% elif not (max_book and total == 0) %}
+{% elif not (max_floor and total == 0) %}
 <div class="text-center py-24 text-gray-700">
   <div class="text-5xl mb-4 opacity-30">◈</div>
   <p class="font-mono-sys text-sm tracking-wide">NO ENTITIES FOUND</p>
