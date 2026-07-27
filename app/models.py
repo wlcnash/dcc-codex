@@ -22,6 +22,7 @@ class Book(Base):
     created_at=Column(DateTime,default=datetime.utcnow)
     chapters=relationship("Chapter",back_populates="book")
     appearances=relationship("EntityAppearance",back_populates="book")
+    floors=relationship("Floor",back_populates="book")
 
 class Chapter(Base):
     __tablename__="chapters"
@@ -33,6 +34,29 @@ class Chapter(Base):
     __table_args__=(UniqueConstraint("book_id","chapter_number"),)
     book=relationship("Book",back_populates="chapters")
     passages=relationship("Passage",back_populates="chapter")
+
+class Floor(Base):
+    """A dungeon floor. floor_number is the show-facing unit fans track progress by --
+    more granular than Book (a floor can start mid-book, and some books span >1 floor)."""
+    __tablename__="floors"
+    id=Column(Integer,primary_key=True)
+    floor_number=Column(Integer,nullable=False,unique=True)
+    start_chapter_id=Column(Integer,ForeignKey("chapters.id"),nullable=False)
+    book_id=Column(Integer,ForeignKey("books.id"),nullable=False)
+    evidence_quote=Column(Text)
+    created_at=Column(DateTime,default=datetime.utcnow)
+    book=relationship("Book",back_populates="floors")
+    start_chapter=relationship("Chapter")
+    appearances=relationship("EntityAppearance",back_populates="floor")
+
+class ChapterFloor(Base):
+    """Read-only mapping of every chapter to the floor it falls within, backed by the
+    `chapter_floors` SQL view (chapter_id -> nearest floor whose start_chapter_id <= it).
+    Never insert/update through this model -- it's a view, not a table."""
+    __tablename__="chapter_floors"
+    chapter_id=Column(Integer,ForeignKey("chapters.id"),primary_key=True)
+    floor_id=Column(Integer,ForeignKey("floors.id"))
+    floor_number=Column(Integer)
 
 class Species(Base):
     __tablename__="species"
@@ -57,23 +81,29 @@ class Entity(Base):
     species=relationship("Species",back_populates="members")
     first_chapter=relationship("Chapter",foreign_keys=[first_chapter_id])
     passages=relationship("Passage",back_populates="entity")
-    appearances=relationship("EntityAppearance",back_populates="entity",order_by="EntityAppearance.book_id")
+    appearances=relationship("EntityAppearance",back_populates="entity",order_by="EntityAppearance.floor_id")
     relationships_as_a=relationship("EntityRelationship",foreign_keys="EntityRelationship.entity_a_id",back_populates="entity_a")
     relationships_as_b=relationship("EntityRelationship",foreign_keys="EntityRelationship.entity_b_id",back_populates="entity_b")
 
 class EntityAppearance(Base):
-    """Per-book image for an entity. One row per (entity, book) pair.
-    Physical passages from THIS book drive the image prompt.
-    Mordecai looks like a cat in Book 1, something else later."""
+    """Per-floor image for an entity. One row per (entity, floor) pair.
+    Physical passages current as of that floor drive the image prompt.
+    book_id is kept (derived from the floor's book) for display/legacy purposes only --
+    floor_id is the authoritative grouping key going forward.
+    Rows created before the floor migration (2026-07-27) have floor_id NULL and are
+    legacy per-book snapshots, superseded once floor-based images are (re)generated."""
     __tablename__="entity_appearances"
     id=Column(Integer,primary_key=True)
     entity_id=Column(Integer,ForeignKey("entities.id",ondelete="CASCADE"),nullable=False)
     book_id=Column(Integer,ForeignKey("books.id",ondelete="CASCADE"),nullable=False)
+    floor_id=Column(Integer,ForeignKey("floors.id"))
     image_url=Column(Text); image_prompt=Column(Text); image_source_passages=Column(ARRAY(Text))
     created_at=Column(DateTime,default=datetime.utcnow)
-    __table_args__=(UniqueConstraint("entity_id","book_id"),)
+    verification_passed=Column(Boolean); verification_log=Column(JSON)
+    __table_args__=(UniqueConstraint("entity_id","floor_id"),)
     entity=relationship("Entity",back_populates="appearances")
     book=relationship("Book",back_populates="appearances")
+    floor=relationship("Floor",back_populates="appearances")
 
 class Passage(Base):
     __tablename__="passages"
@@ -83,6 +113,7 @@ class Passage(Base):
     passage_text=Column(Text,nullable=False)
     passage_type=Column(Enum(PassageTypeEnum,name="passage_type"),nullable=False,default=PassageTypeEnum.physical)
     context_before=Column(Text); context_after=Column(Text); char_offset=Column(Integer)
+    is_durable=Column(Boolean)
     created_at=Column(DateTime,default=datetime.utcnow)
     entity=relationship("Entity",back_populates="passages")
     chapter=relationship("Chapter",back_populates="passages")
