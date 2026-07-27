@@ -163,7 +163,7 @@
     <span class="font-mono-sys text-green-700 text-xs tracking-widest block mb-0.5">SPOILER SHIELD ACTIVE</span>
     <span class="text-gray-500 text-xs">
       {{ hidden_count }} passage{{ 's' if hidden_count != 1 }} from later books are hidden.
-      <a href="/set-book?redirect_to={{ request.url.path }}" class="text-green-700 hover:text-green-500 underline underline-offset-2 transition ml-1">
+      <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-green-700 hover:text-green-500 underline underline-offset-2 transition ml-1">
         Clear filter to see all.
       </a>
     </span>
@@ -251,8 +251,8 @@
 {% else %}
 <div class="text-center py-20 text-gray-800">
   <div class="font-mono-sys text-xs tracking-widest mb-2">NO PASSAGES AVAILABLE</div>
-  {% if max_book %}
-  <p class="text-xs text-gray-800">Spoiler shield may be filtering all passages. <a href="/set-book?redirect_to={{ request.url.path }}" class="text-green-900 hover:text-green-700 underline underline-offset-2">Clear filter.</a></p>
+  {% if max_floor %}
+  <p class="text-xs text-gray-800">Spoiler shield may be filtering all passages. <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-green-900 hover:text-green-700 underline underline-offset-2">Clear filter.</a></p>
   {% endif %}
 </div>
 {% endif %}
