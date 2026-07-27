@@ -17,8 +17,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 IMAGE_BUCKET = "dcc-codex"
 
-ENTITY_TYPE_LABELS = {"character":"Characters","creature":"Creatures","item":"Items","location":"Locations","floor":"Floors","ability":"Abilities","faction":"Factions","other":"Other"}
-ENTITY_TYPE_ICONS = {"character":"👤","creature":"🐉","item":"⚔","location":"🗺","floor":"🏚","ability":"✨","faction":"⚑","other":"◈"}
+ENTITY_TYPE_LABELS = {"crawler":"Crawlers","npc":"NPCs","mob":"Mobs","species":"Species","item":"Items","location":"Locations","floor":"Floors","ability":"Abilities","faction":"Factions","deity":"Deities","media":"Media","other":"Other"}
+ENTITY_TYPE_ICONS = {"crawler":"🎯","npc":"👤","mob":"🐉","species":"🧬","item":"⚔","location":"🗺","floor":"🏚","ability":"✨","faction":"⚑","deity":"⚡","media":"📺","other":"◈"}
 
 def get_max_book(request: Request):
     val = request.cookies.get("max_book")
