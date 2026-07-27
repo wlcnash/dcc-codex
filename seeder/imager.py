@@ -36,7 +36,7 @@ def build_image_prompt(entity_name, entity_type, passages, book_title, book_numb
     response = client.models.generate_content(
         model="gemini-3.6-flash",
         contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.3),
+        config=types.GenerateContentConfig(temperature=0.2),
     )
     return response.text.strip()
 
