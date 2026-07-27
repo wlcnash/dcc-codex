@@ -40,13 +40,17 @@
     .dungeon-card:hover { border-color: var(--dungeon-border-hover); }
 
     /* Type badges */
-    .badge-character { background: #0f2340; color: #6baed6; }
-    .badge-creature  { background: #2d0d0d; color: #c97070; }
+    .badge-crawler   { background: #2e2408; color: #d4af37; }
+    .badge-npc       { background: #0f2340; color: #6baed6; }
+    .badge-mob       { background: #2d0d0d; color: #c97070; }
+    .badge-species   { background: #0a2626; color: #4dd0c4; }
     .badge-item      { background: #241e0a; color: #c9aa60; }
     .badge-location  { background: #0d2314; color: #60c97a; }
     .badge-floor     { background: #1a0d2e; color: #a065c9; }
     .badge-ability   { background: #251510; color: #c97a50; }
     .badge-faction   { background: #0d1b26; color: #60a8c9; }
+    .badge-deity     { background: #2e2410; color: #e8c568; }
+    .badge-media     { background: #2a0d26; color: #d670c9; }
     .badge-other     { background: #1a1a1a; color: #888; }
 
     /* System AI terminal block */
@@ -135,8 +139,9 @@
       <!-- Nav links -->
       <div class="flex items-center gap-5 text-sm flex-1">
         <a href="/browse" class="text-gray-500 hover:text-gold transition">Browse</a>
-        <a href="/browse?entity_type=character" class="text-gray-500 hover:text-gold transition hidden sm:inline">Characters</a>
-        <a href="/browse?entity_type=creature" class="text-gray-500 hover:text-gold transition hidden md:inline">Creatures</a>
+        <a href="/browse?entity_type=crawler" class="text-gray-500 hover:text-gold transition hidden sm:inline">Crawlers</a>
+        <a href="/browse?entity_type=npc" class="text-gray-500 hover:text-gold transition hidden sm:inline">NPCs</a>
+        <a href="/browse?entity_type=mob" class="text-gray-500 hover:text-gold transition hidden md:inline">Mobs</a>
         <a href="/browse?entity_type=location" class="text-gray-500 hover:text-gold transition hidden lg:inline">Locations</a>
       </div>
 
