@@ -38,6 +38,13 @@ For each entity, identify passages from the text that describe:
   physical-state passage just as much as the injury itself was); a character noting they are barefoot, dirty, bloodied,
   bandaged, freshly healed, etc. Do not restrict "physical" to static, isolated description sentences — capture status
   CHANGES to a character's body or gear wherever they occur in the text, dialogue included.
+  CRITICAL — do not stop at the action sentence: when an item is acquired, put on, or changes, the sentence describing
+  WHAT IT LOOKS LIKE (color, pattern, material, size, design) is very often a SEPARATE, nearby sentence — before or after
+  the action sentence, sometimes several sentences away in the same scene. You MUST extract that descriptive sentence too,
+  as its own passage, even though it contains no action verb. Example: if the text has "I pulled my scorched boxers off and
+  slipped the new ones on" and, elsewhere in the same scene, "It was a white pair of boxers covered in little red hearts,"
+  BOTH sentences are required physical passages — extracting only the action sentence and omitting the color/pattern
+  sentence is an incomplete extraction and unacceptable.
 - Personality traits
 - Backstory or origin
 - Abilities or powers
