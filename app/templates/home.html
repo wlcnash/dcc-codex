@@ -16,10 +16,10 @@
     Every entry traces back to the author's exact words.
   </p>
 
-  {% if max_book %}
+  {% if max_floor %}
   <div class="mt-6 inline-flex items-center gap-2 text-xs font-mono-sys text-green-600 bg-green-950 bg-opacity-40 border border-green-900 border-opacity-50 rounded-full px-4 py-1.5">
     <span class="w-1.5 h-1.5 rounded-full bg-green-600 animate-pulse"></span>
-    Spoiler shield through Book {{ max_book }}{% if max_book_obj %}: {{ max_book_obj.title }}{% endif %}
+    Spoiler shield through Floor {{ max_floor }}
   </div>
   {% endif %}
 
@@ -75,17 +75,17 @@
       </a>
     </div>
 
-    <!-- Book index -->
-    <div class="font-mono-sys text-xs text-gray-700 tracking-widest uppercase mt-6 mb-3">Book Index</div>
+    <!-- Floor index -->
+    <div class="font-mono-sys text-xs text-gray-700 tracking-widest uppercase mt-6 mb-3">Floor Index</div>
     <div class="dungeon-card rounded-lg overflow-hidden">
-      {% for book in books %}
+      {% for floor in floors %}
       <div class="flex items-center gap-3 px-4 py-2.5 border-b border-gray-900 last:border-0
-                  {% if max_book == book.book_number %}bg-green-950 bg-opacity-30{% endif %}">
-        <span class="font-mono-sys text-xs text-gray-700 w-4 flex-shrink-0">{{ book.book_number }}</span>
-        <span class="text-xs text-gray-500 flex-1 truncate">{{ book.title }}</span>
-        {% if max_book and max_book >= book.book_number %}
+                  {% if max_floor == floor.floor_number %}bg-green-950 bg-opacity-30{% endif %}">
+        <span class="font-mono-sys text-xs text-gray-700 w-4 flex-shrink-0">{{ floor.floor_number }}</span>
+        <span class="text-xs text-gray-500 flex-1 truncate">Floor {{ floor.floor_number }}{% if floor.book %} · {{ floor.book.title }}{% endif %}</span>
+        {% if max_floor and max_floor >= floor.floor_number %}
         <span class="font-mono-sys text-xs text-green-800">✓</span>
-        {% elif max_book and max_book < book.book_number %}
+        {% elif max_floor and max_floor < floor.floor_number %}
         <span class="font-mono-sys text-xs text-gray-800">✗</span>
         {% endif %}
       </div>
@@ -152,8 +152,8 @@
     <div>
       <div class="font-mono-sys text-xs text-yellow-900 mb-2 tracking-widest">SPOILER CONTROL</div>
       <p class="text-gray-500 text-sm leading-relaxed">
-        Use the book selector in the nav to limit results through whichever book you're currently reading.
-        Entities and passages from later books will be hidden automatically.
+        Use the floor selector in the nav to limit results through whichever floor you're currently on.
+        Entities and passages from later floors will be hidden automatically.
       </p>
     </div>
   </div>
