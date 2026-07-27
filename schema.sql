@@ -145,5 +145,5 @@ INSERT INTO books (title, book_number, royal_road_url) VALUES
     ('The Gate of the Feral Gods',                        4, 'https://www.royalroad.com/fiction/12518/dungeon-crawler-carl'),
     ('The Butcher''s Masquerade',                         5, 'https://www.royalroad.com/fiction/12518/dungeon-crawler-carl'),
     ('The Eye of the Bedlam Bride',                       6, 'https://www.royalroad.com/fiction/12518/dungeon-crawler-carl'),
-    ('The Hive',                                          7, 'https://www.royalroad.com/fiction/12518/dungeon-crawler-carl'),
-    ('The Great Undying Interstitial Realm of Nightmare', 8, 'https://www.royalroad.com/fiction/12518/dungeon-crawler-carl');
+    ('This Inevitable Ruin',                            7, 'https://www.royalroad.com/fiction/12518/dungeon-crawler-carl'),
+    ('A Parade of Horribles',                          8, 'https://www.royalroad.com/fiction/12518/dungeon-crawler-carl');
