@@ -8,8 +8,8 @@ class Base(DeclarativeBase):
     pass
 
 class EntityTypeEnum(str, enum.Enum):
-    character="character"; creature="creature"; item="item"; location="location"
-    floor="floor"; ability="ability"; faction="faction"; other="other"
+    crawler="crawler"; npc="npc"; mob="mob"; species="species"; item="item"; location="location"
+    floor="floor"; ability="ability"; faction="faction"; deity="deity"; media="media"; other="other"
 
 class PassageTypeEnum(str, enum.Enum):
     physical="physical"; personality="personality"; backstory="backstory"
