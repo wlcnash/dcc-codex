@@ -22,6 +22,7 @@ from extractor import run_extractor
 from imager   import run_imager
 from persona  import run_persona, run_migrate
 from permanence import run_classify
+from floors import run_floor_extraction
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,7 +33,7 @@ logger = logging.getLogger("seeder")
 # Chapter boundaries (1-indexed) — where each book starts
 BOOK_BOUNDARIES = [1, 52, 107, 162, 215, 268, 321, 374]
 
-VALID_STEPS = ["all", "scrape", "extract", "classify", "images", "persona", "migrate"]
+VALID_STEPS = ["all", "scrape", "extract", "classify", "floors", "images", "persona", "migrate"]
 
 
 def get_db_conn():
@@ -123,6 +124,11 @@ def main():
         logger.info("=== STEP 2b: Classifying physical passages as durable/transient ===")
         count = run_classify(conn, gemini_key, batch_size=batch)
         logger.info(f"Classified {count} passages.")
+
+    if args.step in ("all", "floors"):
+        logger.info("=== STEP 2c: Extracting dungeon-floor transitions (one-time, hard points) ===")
+        count = run_floor_extraction(conn, gemini_key)
+        logger.info(f"Recorded {count} floor transitions.")
 
     if args.step in ("all", "images"):
         logger.info("=== STEP 3: Generating images with Imagen 3 ===")
