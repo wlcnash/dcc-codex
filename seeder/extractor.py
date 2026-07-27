@@ -30,7 +30,14 @@ EXTRACTION_PROMPT = """You are a precise literary analyst processing the LitRPG 
 Analyze the chapter text below and extract ALL named entities — characters, creatures, items, locations, floors, abilities, and factions.
 
 For each entity, identify passages from the text that describe:
-- Physical appearance (most important — size, color, shape, materials, anatomy)
+- Physical appearance (most important — size, color, shape, materials, anatomy, AND current clothing/gear/equipment status,
+  even if that detail is embedded in dialogue or an action beat rather than stated as plain description.
+  Examples of physical passages you MUST catch: a character putting on, taking off, receiving, losing, or declining an item
+  of clothing/armor/gear ("You have boots now!" / "I pulled my scorched boxers off and slipped the new ones on");
+  a wound, injury, or debuff being described, worsening, OR resolving/healing ("I sat up" after being critically hurt is a
+  physical-state passage just as much as the injury itself was); a character noting they are barefoot, dirty, bloodied,
+  bandaged, freshly healed, etc. Do not restrict "physical" to static, isolated description sentences — capture status
+  CHANGES to a character's body or gear wherever they occur in the text, dialogue included.
 - Personality traits
 - Backstory or origin
 - Abilities or powers
@@ -266,3 +273,63 @@ def run_extractor(conn, gemini_api_key: str, batch_size: int = 10):
     cur.close()
     logger.info(f"Extraction complete. {total_entities} entity refs, {total_passages} passages.")
     return total_entities
+
+
+def run_extractor_forced(conn, gemini_api_key: str, chapter_ids: list[int]):
+    """
+    Force re-extraction on specific chapters regardless of whether they already
+    have passages. Safe to run on already-processed chapters: insert_passages()
+    dedupes by exact passage text per (entity, chapter), so this only ADDS
+    passages the (possibly improved) prompt catches that the original pass
+    missed -- it never deletes or duplicates existing rows.
+    """
+    client = genai.Client(api_key=gemini_api_key)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, book_id, chapter_number, chapter_title, raw_text FROM chapters WHERE id = ANY(%s) ORDER BY book_id, chapter_number",
+        (chapter_ids,),
+    )
+    chapters = cur.fetchall()
+    cur.close()
+
+    if not chapters:
+        logger.info("No matching chapters found for forced re-extraction.")
+        return 0
+
+    logger.info(f"Force re-extracting {len(chapters)} chapters...")
+    total_new_passages = 0
+
+    for chap_id, book_id, chap_num, chap_title, raw_text in chapters:
+        logger.info(f"  Re-processing chapter {chap_num}: {chap_title}")
+        result = extract_from_chapter(raw_text, client)
+        if not result or "entities" not in result:
+            logger.warning(f"  No entities extracted from chapter {chap_num}")
+            continue
+
+        cur = conn.cursor()
+        chapter_new = 0
+        for entity_data in result["entities"]:
+            try:
+                cur.execute("SAVEPOINT sp_entity")
+                entity_id = upsert_entity(cur, entity_data, book_id, chap_id)
+                if entity_id is None:
+                    cur.execute("RELEASE SAVEPOINT sp_entity")
+                    continue
+                passages = entity_data.get("passages", [])
+                cur.execute("SELECT COUNT(*) FROM passages WHERE entity_id=%s AND chapter_id=%s", (entity_id, chap_id))
+                before = cur.fetchone()[0]
+                insert_passages(cur, entity_id, chap_id, passages)
+                cur.execute("SELECT COUNT(*) FROM passages WHERE entity_id=%s AND chapter_id=%s", (entity_id, chap_id))
+                after = cur.fetchone()[0]
+                chapter_new += (after - before)
+                cur.execute("RELEASE SAVEPOINT sp_entity")
+            except Exception as e:
+                cur.execute("ROLLBACK TO SAVEPOINT sp_entity")
+                logger.warning(f"  Skipped entity '{entity_data.get('name', '?')}': {e}")
+        conn.commit()
+        cur.close()
+        logger.info(f"  Chapter {chap_num}: {chapter_new} new passages")
+        total_new_passages += chapter_new
+
+    logger.info(f"Forced re-extraction complete. {total_new_passages} new passages added.")
+    return total_new_passages
