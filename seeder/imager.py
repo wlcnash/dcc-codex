@@ -29,7 +29,13 @@ PROMPT_BUILDER_USER = (
     "and all specific details mentioned: colors, sizes, materials, anatomy. Max 400 words. "
     "IMPORTANT: only include objects, gear, and held items that are explicitly listed in the passages above. "
     "Do not add weapons, tools, or props of your own invention. If no weapon or held item is described, the "
-    "final sentence of the prompt must explicitly state that the hands are empty and no weapon is present."
+    "final sentence of the prompt must explicitly state that the hands are empty and no weapon is present. "
+    "GROUNDING RULE, NO EXCEPTIONS: for any physical attribute NOT covered by the passages above (for example: "
+    "hair color/length/style, eye color, facial hair, skin tone detail, specific facial features), do NOT invent "
+    "or state a specific value for it. Leave it out of the prompt entirely rather than guessing. It is far better "
+    "for the illustration to render an unremarkable, generic default for an unmentioned attribute than for this "
+    "prompt to assert a specific detail the source text never established. Only when a future book's passages "
+    "describe that attribute should it ever appear in a prompt."
 )
 
 VERIFY_SYSTEM = (
