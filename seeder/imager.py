@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 IMAGE_BUCKET = "dcc-codex"
 RATE_LIMIT_SECONDS = 3.0
 TRANSIENT_RECENT_LIMIT = 3
+MAX_IMAGE_ATTEMPTS = 3
 
 PROMPT_BUILDER_SYSTEM = (
     "You are creating image generation prompts for a Dungeon Crawler Carl compendium. "
@@ -25,7 +26,26 @@ PROMPT_BUILDER_USER = (
     "Create a single detailed image prompt capturing the appearance described above, resolved to his current, "
     "present-day state. "
     "Include: visual style (dark fantasy illustration), dungeon torchlight lighting, "
-    "and all specific details mentioned: colors, sizes, materials, anatomy. Max 400 words."
+    "and all specific details mentioned: colors, sizes, materials, anatomy. Max 400 words. "
+    "IMPORTANT: only include objects, gear, and held items that are explicitly listed in the passages above. "
+    "Do not add weapons, tools, or props of your own invention. If no weapon or held item is described, the "
+    "final sentence of the prompt must explicitly state that the hands are empty and no weapon is present."
+)
+
+VERIFY_SYSTEM = (
+    "You are a strict visual QA checker for an AI-generated character illustration. You will be given the "
+    "exact image-generation prompt that was used, and the resulting image. Your job is to catch anything the "
+    "image renderer added that was NOT requested in the prompt — this is a common failure mode where the "
+    "renderer invents extra objects (most often weapons: knives, axes, swords, guns) that have no basis in "
+    "the prompt at all.\n\n"
+    "Check specifically:\n"
+    "1. Is the character holding, wearing, or carrying ANY weapon, tool, or object that is not explicitly "
+    "named in the prompt? If the prompt says hands are empty / no weapon present, and the image shows the "
+    "character holding ANYTHING, that is a violation.\n"
+    "2. List every such unsourced object you can identify.\n\n"
+    "Respond with ONLY a JSON object: "
+    '{\"unsourced_objects\": [\"short description\", ...], \"pass\": true/false}. '
+    "pass=false if unsourced_objects is non-empty. No other text."
 )
 
 
@@ -61,6 +81,74 @@ def generate_image(prompt, client):
         return None
 
 
+def verify_image(image_bytes, prompt, client):
+    """Ask a vision-capable Gemini call whether the rendered image contains anything not in the prompt.
+
+    Returns (passed: bool, unsourced_objects: list[str], raw_error: str|None).
+    On any failure to get a parseable verdict, returns (True, [], error) -- i.e. we do NOT block publishing
+    on a broken verifier, we just fail to catch that specific image. This is intentionally a checker, not a
+    silent gate that can wedge the whole pipeline if the verifier call itself errors.
+    """
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=[
+                VERIFY_SYSTEM,
+                "PROMPT USED TO GENERATE THIS IMAGE:\n" + prompt,
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+            ],
+            config=types.GenerateContentConfig(temperature=0.0),
+        )
+        text = response.text.strip()
+        import re
+        text = re.sub(r"^```(json)?|```$", "", text, flags=re.MULTILINE).strip()
+        result = json.loads(text)
+        unsourced = result.get("unsourced_objects", [])
+        passed = bool(result.get("pass", len(unsourced) == 0))
+        return passed, unsourced, None
+    except Exception as e:
+        logger.warning("Image verification call failed (not blocking): %s", e)
+        return True, [], str(e)
+
+
+def generate_and_verify_image(prompt, client, max_attempts=MAX_IMAGE_ATTEMPTS):
+    """Generate an image, verify it against the prompt, and retry with a stricter prompt if it fails.
+
+    Returns (image_bytes, final_prompt_used, verification_log) where verification_log is a list of
+    per-attempt dicts: {"attempt": n, "passed": bool, "unsourced_objects": [...], "error": str|None}.
+    If every attempt fails verification, returns the LAST attempt's image anyway (better to publish a
+    flagged image than none), with verification_log showing the failure history for audit.
+    """
+    verification_log = []
+    current_prompt = prompt
+    last_image_bytes = None
+
+    for attempt in range(1, max_attempts + 1):
+        image_bytes = generate_image(current_prompt, client)
+        if image_bytes is None:
+            verification_log.append({"attempt": attempt, "passed": False, "unsourced_objects": [], "error": "no_image_returned"})
+            continue
+
+        last_image_bytes = image_bytes
+        passed, unsourced, err = verify_image(image_bytes, current_prompt, client)
+        verification_log.append({"attempt": attempt, "passed": passed, "unsourced_objects": unsourced, "error": err})
+
+        if passed:
+            return image_bytes, current_prompt, verification_log
+
+        logger.warning("  Verification failed (attempt %d): unsourced objects %s", attempt, unsourced)
+        if attempt < max_attempts:
+            current_prompt = (
+                prompt
+                + "\n\nSTRICT CORRECTION: a previous attempt at this exact prompt incorrectly added: "
+                + ", ".join(unsourced)
+                + ". Do NOT include any of these in this image. Hands must be empty unless a held item is "
+                "explicitly named above."
+            )
+
+    return last_image_bytes, current_prompt, verification_log
+
+
 def upload_to_minio(minio_client, slug, book_id, image_bytes):
     key = "entities/{}/book_{}.jpg".format(slug, book_id)
     minio_client.put_object(Bucket=IMAGE_BUCKET, Key=key, Body=io.BytesIO(image_bytes), ContentType="image/jpeg")
@@ -72,6 +160,14 @@ def ensure_bucket(minio_client):
         minio_client.head_bucket(Bucket=IMAGE_BUCKET)
     except Exception:
         minio_client.create_bucket(Bucket=IMAGE_BUCKET)
+
+
+def run_migrate(conn) -> None:
+    cur = conn.cursor()
+    cur.execute("ALTER TABLE entity_appearances ADD COLUMN IF NOT EXISTS verification_passed BOOLEAN")
+    cur.execute("ALTER TABLE entity_appearances ADD COLUMN IF NOT EXISTS verification_log JSONB")
+    conn.commit()
+    cur.close()
 
 
 def log_run_start(conn, step, meta=None):
@@ -160,7 +256,12 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
     Generate per-book images for entities.
     One image per (entity, book) pair where physical passages exist.
     Stores in entity_appearances; also keeps entities.image_url updated for backward compat.
+    Every generated image is checked against its own prompt by a second vision model call before being
+    accepted; images that add unsourced objects (most commonly weapons) get up to MAX_IMAGE_ATTEMPTS
+    retries with an explicit correction appended. The full verification history is stored per appearance
+    so failures are auditable even when a retry doesn't fully resolve them.
     """
+    run_migrate(conn)
     run_id = log_run_start(conn, "images", {"batch_size": batch_size})
     client = genai.Client(api_key=gemini_api_key)
     minio_client = boto3.client(
@@ -198,6 +299,7 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
     logger.info("Generating per-book images for %d (entity, book) pairs...", len(targets))
     generated = 0
     failed = 0
+    flagged = 0
 
     for entity_id, name, slug, entity_type, is_major, book_id, book_number, book_title in targets:
         durable, transient = _fetch_passages(conn, entity_id, book_id, book_number)
@@ -214,11 +316,17 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
             failed += 1
             continue
 
-        image_bytes = generate_image(image_prompt, client)
+        image_bytes, final_prompt, verification_log = generate_and_verify_image(image_prompt, client)
         if image_bytes is None:
             logger.warning("  No image for %s book %d", name, book_number)
             failed += 1
             continue
+
+        verification_passed = verification_log[-1]["passed"] if verification_log else None
+        if not verification_passed:
+            flagged += 1
+            logger.warning("  %s book %d PUBLISHED WITH FLAG -- unresolved unsourced objects: %s",
+                            name, book_number, verification_log[-1].get("unsourced_objects"))
 
         try:
             image_url = upload_to_minio(minio_client, slug, book_id, image_bytes)
@@ -230,13 +338,16 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
         all_passages = durable + transient
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO entity_appearances (entity_id, book_id, image_url, image_prompt, image_source_passages)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO entity_appearances
+                (entity_id, book_id, image_url, image_prompt, image_source_passages, verification_passed, verification_log)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (entity_id, book_id) DO UPDATE SET
                 image_url = EXCLUDED.image_url,
                 image_prompt = EXCLUDED.image_prompt,
-                image_source_passages = EXCLUDED.image_source_passages
-        """, (entity_id, book_id, image_url, image_prompt, all_passages))
+                image_source_passages = EXCLUDED.image_source_passages,
+                verification_passed = EXCLUDED.verification_passed,
+                verification_log = EXCLUDED.verification_log
+        """, (entity_id, book_id, image_url, final_prompt, all_passages, verification_passed, json.dumps(verification_log)))
         cur.execute("""
             UPDATE entities SET image_url=%s, image_prompt=%s, image_source_passages=%s
             WHERE id=%s AND (image_url IS NULL OR NOT EXISTS (
@@ -244,12 +355,12 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
                 JOIN books b2 ON b2.id=ea2.book_id
                 WHERE ea2.entity_id=%s AND b2.book_number>%s
             ))
-        """, (image_url, image_prompt, all_passages, entity_id, entity_id, book_number))
+        """, (image_url, final_prompt, all_passages, entity_id, entity_id, book_number))
         conn.commit()
         cur.close()
         generated += 1
-        logger.info("  OK %s (book %d) -> %s", name, book_number, image_url)
+        logger.info("  OK %s (book %d) -> %s (verified=%s)", name, book_number, image_url, verification_passed)
 
     log_run_finish(conn, run_id, generated, failed)
-    logger.info("Done. %d generated, %d failed.", generated, failed)
+    logger.info("Done. %d generated, %d failed, %d published with unresolved verification flags.", generated, failed, flagged)
     return generated
