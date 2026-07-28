@@ -24,6 +24,24 @@ rejection path -- never trust a response just because response.text is non-empty
 Confirmed via direct reproduction: the same prompt that produced a 64-char fragment
 under the old config produced a clean, complete, finish_reason=STOP profile at
 max_output_tokens=2048.
+
+2026-07-28 fix #2 (Wes's feedback after reading Carl's regenerated persona live):
+the persona was describing acute, floor-specific combat state ("covered in blood, bug
+chitin, and white goo... deep scalp wounds, phantom limb pain, and severe arm burns")
+as if it were the character's permanent description. Root cause: the passage query
+below pulled ANY physical/action passage regardless of the existing `is_durable`
+classification (see seeder/permanence.py) -- so a one-off injury-mid-fight passage was
+just as likely to get sampled into the "who is this person" blurb as a genuinely
+permanent trait. Since persona_text is ONE non-floor-keyed field per entity (there is
+no per-floor persona regeneration, and there should not be one -- per Wes: "shouldn't
+we keep the status specifics out of the summary since they change floor to floor...
+he should look like the same person," meaning only the PORTRAIT should vary by floor,
+not the identity blurb), any transient detail baked into persona_text would read as
+permanently, perpetually true no matter which floor a visitor is looking at, which is
+wrong on its face. Fixed by filtering physical/action passages to `is_durable = TRUE
+OR is_durable IS NULL` (excluding only passages positively classified transient) and
+adding an explicit prompt instruction to describe durable identity/personality, not
+current injury/combat/gear state.
 """
 
 import logging
@@ -58,6 +76,13 @@ Rules:
 - Make it punchy and specific — no generic sentences that could apply to any entity
 - Vary your sentence subjects — don't lead every sentence with the entity's name
 - No heading, no quotes, no markdown — just the raw profile text
+- IMPORTANT: this profile is shown to visitors regardless of which floor/point in the story they're
+  reading about, so it must describe PERMANENT, DURABLE traits only — build, personality, standing
+  role, established backstory. Do NOT describe a specific in-progress injury, a specific fight's
+  blood/gore, or transient current-moment gear/condition as if it were a permanent description, even
+  if the source passages mention it. If a passage only shows a passing combat state, either omit that
+  detail or, if it's illustrative of personality/resilience, phrase it as a general pattern of behavior
+  rather than "he is currently covered in X."
 
 Entity Name: {name}
 Entity Type: {entity_type}
@@ -149,12 +174,18 @@ def run_persona(conn, gemini_api_key: str, batch_size: int = 999999, entity_ids=
     truncated = 0
 
     for entity_id, entity_name, entity_type in entities:
-        # Fetch passages — prioritize physical + personality; cap at ~3000 chars
+        # Fetch passages — prioritize physical + personality; cap at ~3000 chars.
+        # 2026-07-28: physical/action passages are filtered to durable-or-unclassified
+        # only (is_durable IS NOT FALSE) so a one-off injury/combat-state passage never
+        # gets sampled into this entity's permanent, floor-agnostic identity blurb.
+        # personality/backstory/ability passages are inherently non-transient, so they're
+        # left unfiltered.
         cur = conn.cursor()
         cur.execute("""
             SELECT p.passage_text, p.passage_type
             FROM passages p
             WHERE p.entity_id = %s
+              AND (p.passage_type NOT IN ('physical', 'action') OR p.is_durable IS NOT FALSE)
             ORDER BY
                 CASE p.passage_type
                     WHEN 'physical'     THEN 1
