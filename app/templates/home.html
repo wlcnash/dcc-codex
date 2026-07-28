@@ -6,19 +6,19 @@
 <!-- Hero -->
 <div class="py-14 mb-16 text-center relative">
   <!-- Decorative lines -->
-  <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-yellow-900 to-transparent opacity-60"></div>
-  <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-yellow-900 to-transparent opacity-60"></div>
+  <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#4a3a10] to-transparent opacity-60"></div>
+  <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#4a3a10] to-transparent opacity-60"></div>
 
-  <div class="font-mono-sys text-xs text-yellow-900 tracking-widest mb-4 uppercase">Contestant Knowledge Base — Dungeon System v8.3.1</div>
+  <div class="font-mono-sys text-xs text-gold-dim tracking-widest mb-4 uppercase">Contestant Knowledge Base — Dungeon System v8.3.1</div>
   <h1 class="font-display text-5xl md:text-6xl font-bold text-gold mb-4 tracking-wider">DCC Codex</h1>
-  <p class="text-gray-500 text-lg max-w-xl mx-auto leading-relaxed">
-    Source-anchored visual compendium for <em class="text-gray-400 not-italic">Dungeon Crawler Carl</em>.
+  <p class="text-gray-400 text-lg max-w-xl mx-auto leading-relaxed">
+    Source-anchored visual compendium for <em class="text-gray-300 not-italic">Dungeon Crawler Carl</em>.
     Every entry traces back to the author's exact words.
   </p>
 
   {% if max_floor %}
-  <div class="mt-6 inline-flex items-center gap-2 text-xs font-mono-sys text-green-600 bg-green-950 bg-opacity-40 border border-green-900 border-opacity-50 rounded-full px-4 py-1.5">
-    <span class="w-1.5 h-1.5 rounded-full bg-green-600 animate-pulse"></span>
+  <div class="mt-6 inline-flex items-center gap-2 text-xs font-mono-sys text-gold bg-[#1a1608] border border-[#3d2e00] rounded px-4 py-1.5">
+    <span class="w-1.5 h-1.5 rounded-full bg-[#8a6a28]"></span>
     Spoiler shield through Floor {{ max_floor }}
   </div>
   {% endif %}
@@ -27,19 +27,19 @@
   <div class="flex flex-wrap justify-center gap-x-12 gap-y-4 mt-10">
     <div class="text-center">
       <div class="font-display text-3xl font-bold text-gold">{{ total_entities }}</div>
-      <div class="text-gray-600 text-xs font-mono-sys tracking-widest mt-1 uppercase">Entities</div>
+      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-1 uppercase">Entities</div>
     </div>
     <div class="text-center">
       <div class="font-display text-3xl font-bold text-gold">{{ total_passages }}</div>
-      <div class="text-gray-600 text-xs font-mono-sys tracking-widest mt-1 uppercase">Source Passages</div>
+      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-1 uppercase">Source Passages</div>
     </div>
     <div class="text-center">
       <div class="font-display text-3xl font-bold text-gold">{{ total_chapters }}</div>
-      <div class="text-gray-600 text-xs font-mono-sys tracking-widest mt-1 uppercase">Chapters</div>
+      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-1 uppercase">Chapters</div>
     </div>
     <div class="text-center">
       <div class="font-display text-3xl font-bold text-gold">{{ imaged_entities }}</div>
-      <div class="text-gray-600 text-xs font-mono-sys tracking-widest mt-1 uppercase">Visualized</div>
+      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-1 uppercase">Visualized</div>
     </div>
   </div>
 </div>
@@ -49,11 +49,11 @@
 
   <!-- Entity Type Manifest (2 cols) -->
   <div class="lg:col-span-2">
-    <div class="font-mono-sys text-xs text-gray-700 tracking-widest uppercase mb-3">Floor Access Manifest</div>
+    <div class="font-mono-sys text-xs text-gray-400 tracking-widest uppercase mb-3">Floor Access Manifest</div>
     <div class="dungeon-card rounded-lg overflow-hidden">
       <div class="border-b border-gray-900 px-4 py-2 flex items-center justify-between">
-        <span class="font-mono-sys text-xs text-yellow-900 tracking-wider">ENTITY REGISTRY</span>
-        <span class="font-mono-sys text-xs text-gray-700">{{ total_entities }} total</span>
+        <span class="font-mono-sys text-xs text-gold-dim tracking-wider">ENTITY REGISTRY</span>
+        <span class="font-mono-sys text-xs text-gray-400">{{ total_entities }} total</span>
       </div>
       {% for type_key, label in entity_type_labels.items() %}
       {% set count = counts_by_type.get(type_key, 0) %}
@@ -62,31 +62,31 @@
          class="flex items-center gap-3 px-4 py-3 border-b border-gray-900 last:border-0 hover:bg-gray-900 hover:bg-opacity-50 transition group">
         <span class="text-base w-6 text-center opacity-70 group-hover:opacity-100 transition">{{ entity_type_icons[type_key] }}</span>
         <span class="flex-1 text-sm text-gray-400 group-hover:text-gray-200 transition">{{ label }}</span>
-        <span class="font-mono-sys text-xs text-gray-700 group-hover:text-yellow-800 transition tabular-nums">{{ count }}</span>
-        <span class="text-gray-800 group-hover:text-yellow-800 transition text-xs">→</span>
+        <span class="font-mono-sys text-xs text-gray-400 group-hover:text-gold transition tabular-nums">{{ count }}</span>
+        <span class="text-gray-400 group-hover:text-gold transition text-xs">→</span>
       </a>
       {% endif %}
       {% endfor %}
       <a href="/browse"
          class="flex items-center gap-3 px-4 py-3 hover:bg-gray-900 hover:bg-opacity-50 transition group">
         <span class="text-base w-6 text-center opacity-50">◈</span>
-        <span class="flex-1 text-sm text-gray-600 group-hover:text-gray-400 transition">View All Entities</span>
-        <span class="text-gray-800 group-hover:text-yellow-800 transition text-xs">→</span>
+        <span class="flex-1 text-sm text-gray-400 group-hover:text-gray-200 transition">View All Entities</span>
+        <span class="text-gray-400 group-hover:text-gold transition text-xs">→</span>
       </a>
     </div>
 
     <!-- Floor index -->
-    <div class="font-mono-sys text-xs text-gray-700 tracking-widest uppercase mt-6 mb-3">Floor Index</div>
+    <div class="font-mono-sys text-xs text-gray-400 tracking-widest uppercase mt-6 mb-3">Floor Index</div>
     <div class="dungeon-card rounded-lg overflow-hidden">
       {% for floor in floors %}
       <div class="flex items-center gap-3 px-4 py-2.5 border-b border-gray-900 last:border-0
-                  {% if max_floor == floor.floor_number %}bg-green-950 bg-opacity-30{% endif %}">
-        <span class="font-mono-sys text-xs text-gray-700 w-4 flex-shrink-0">{{ floor.floor_number }}</span>
-        <span class="text-xs text-gray-500 flex-1 truncate">Floor {{ floor.floor_number }}{% if floor.book %} · {{ floor.book.title }}{% endif %}</span>
+                  {% if max_floor == floor.floor_number %}bg-[#1a1608]{% endif %}">
+        <span class="font-mono-sys text-xs text-gray-400 w-4 flex-shrink-0">{{ floor.floor_number }}</span>
+        <span class="text-xs text-gray-400 flex-1 truncate">Floor {{ floor.floor_number }}{% if floor.book %} · {{ floor.book.title }}{% endif %}</span>
         {% if max_floor and max_floor >= floor.floor_number %}
-        <span class="font-mono-sys text-xs text-green-800">✓</span>
+        <span class="font-mono-sys text-xs text-gold-dim">✓</span>
         {% elif max_floor and max_floor < floor.floor_number %}
-        <span class="font-mono-sys text-xs text-gray-800">✗</span>
+        <span class="font-mono-sys text-xs text-gray-600">✗</span>
         {% endif %}
       </div>
       {% endfor %}
@@ -97,8 +97,8 @@
   {% if featured %}
   <div class="lg:col-span-3">
     <div class="flex items-end justify-between mb-3">
-      <div class="font-mono-sys text-xs text-gray-700 tracking-widest uppercase">Notable Contestants</div>
-      <a href="/browse?major_only=true" class="text-xs text-gray-700 hover:text-gold transition">View all →</a>
+      <div class="font-mono-sys text-xs text-gray-400 tracking-widest uppercase">Notable Contestants</div>
+      <a href="/browse?major_only=true" class="text-xs text-gray-400 hover:text-gold transition">View all →</a>
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {% for entity in featured %}
@@ -118,7 +118,7 @@
             <span class="text-xs px-1.5 py-0.5 rounded badge-{{ entity.entity_type.value }} capitalize">
               {{ entity.entity_type.value }}
             </span>
-            {% if entity.is_major %}<span class="text-yellow-700 text-xs">★</span>{% endif %}
+            {% if entity.is_major %}<span class="text-gold text-xs">★</span>{% endif %}
           </div>
         </div>
       </a>
@@ -136,22 +136,22 @@
   </div>
   <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-6">
     <div>
-      <div class="font-mono-sys text-xs text-yellow-900 mb-2 tracking-widest">SOURCE FIDELITY</div>
-      <p class="text-gray-500 text-sm leading-relaxed">
+      <div class="font-mono-sys text-xs text-gold-dim mb-2 tracking-widest">SOURCE FIDELITY</div>
+      <p class="text-gray-400 text-sm leading-relaxed">
         Unlike wikis that paraphrase, every entry here traces back to Matt Dinniman's exact words.
         Click any entity to read every passage from all eight books.
       </p>
     </div>
     <div>
-      <div class="font-mono-sys text-xs text-yellow-900 mb-2 tracking-widest">VISUALIZATION</div>
-      <p class="text-gray-500 text-sm leading-relaxed">
+      <div class="font-mono-sys text-xs text-gold-dim mb-2 tracking-widest">VISUALIZATION</div>
+      <p class="text-gray-400 text-sm leading-relaxed">
         Images are generated by Imagen 3 using only details present in the source text.
         The prompt used to generate each image is shown alongside the passages that informed it.
       </p>
     </div>
     <div>
-      <div class="font-mono-sys text-xs text-yellow-900 mb-2 tracking-widest">SPOILER CONTROL</div>
-      <p class="text-gray-500 text-sm leading-relaxed">
+      <div class="font-mono-sys text-xs text-gold-dim mb-2 tracking-widest">SPOILER CONTROL</div>
+      <p class="text-gray-400 text-sm leading-relaxed">
         Use the floor selector in the nav to limit results through whichever floor you're currently on.
         Entities and passages from later floors will be hidden automatically.
       </p>
