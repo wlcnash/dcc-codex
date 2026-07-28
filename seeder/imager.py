@@ -22,7 +22,7 @@ PROMPT_BUILDER_USER = (
     "create an image generation prompt for: {entity_name} ({entity_type})\n\n"
     "PASSAGES, in story order (earlier passages first, most recent last). If two passages describe the "
     "same thing differently (e.g. footwear, an item he's carrying, an injury), the LATER passage in this "
-    "list is what's currently true — use that one and ignore the earlier, superseded detail:\n{passages}\n\n"
+    "list is what's currently true -- use that one and ignore the earlier, superseded detail:\n{passages}\n\n"
     "Create a single detailed image prompt capturing the appearance described above, resolved to his current, "
     "present-day state. "
     "Include: visual style (dark fantasy illustration), dungeon torchlight lighting, "
@@ -30,6 +30,9 @@ PROMPT_BUILDER_USER = (
     "IMPORTANT: only include objects, gear, and held items that are explicitly listed in the passages above. "
     "Do not add weapons, tools, or props of your own invention. If no weapon or held item is described, the "
     "final sentence of the prompt must explicitly state that the hands are empty and no weapon is present. "
+    "If this is a LOCATION or environment (not a character), the final sentence of the prompt must explicitly "
+    "state whether any person is present, based only on the passages above -- if no person is described in the "
+    "passages, state explicitly that the scene shows no people, empty of any figures. "
     "GROUNDING RULE, NO EXCEPTIONS: for any physical attribute NOT covered by the passages above (for example: "
     "hair color/length/style, eye color, facial hair, skin tone detail, specific facial features), do NOT invent "
     "or state a specific value for it. Leave it out of the prompt entirely rather than guessing. It is far better "
@@ -39,18 +42,25 @@ PROMPT_BUILDER_USER = (
 )
 
 VERIFY_SYSTEM = (
-    "You are a strict visual QA checker for an AI-generated character illustration. You will be given the "
-    "exact image-generation prompt that was used, and the resulting image. Your job is to catch anything the "
-    "image renderer added that was NOT requested in the prompt — this is a common failure mode where the "
-    "renderer invents extra objects (most often weapons: knives, axes, swords, guns) that have no basis in "
-    "the prompt at all.\n\n"
+    "You are a strict visual QA checker for an AI-generated illustration used in a Dungeon Crawler Carl "
+    "compendium. You will be given the exact image-generation prompt that was used, and the resulting image. "
+    "Your job is to catch anything the image renderer added that was NOT requested in the prompt -- this "
+    "covers two known failure modes:\n\n"
+    "1. UNSOURCED OBJECTS: the renderer commonly invents extra objects (most often weapons: knives, axes, "
+    "swords, guns) that have no basis in the prompt. If the prompt says hands are empty / no weapon present, "
+    "and the image shows the character holding ANYTHING, that is a violation.\n"
+    "2. UNSOURCED PEOPLE/CHARACTERS: for location and environment prompts especially, the renderer commonly "
+    "populates an otherwise-empty scene with generic background people (staff, bystanders, crowds) that are "
+    "not named or described in the prompt at all. If the prompt states the scene has no people / is empty of "
+    "figures, and the image shows ANY person or humanoid figure -- even one that looks incidental or purely "
+    "decorative background -- that is a violation.\n\n"
     "Check specifically:\n"
     "1. Is the character holding, wearing, or carrying ANY weapon, tool, or object that is not explicitly "
-    "named in the prompt? If the prompt says hands are empty / no weapon present, and the image shows the "
-    "character holding ANYTHING, that is a violation.\n"
-    "2. List every such unsourced object you can identify.\n\n"
+    "named in the prompt?\n"
+    "2. Does the image contain ANY person/humanoid figure that the prompt did not call for?\n"
+    "3. List every such unsourced object or person you can identify.\n\n"
     "Respond with ONLY a JSON object: "
-    '{\"unsourced_objects\": [\"short description\", ...], \"pass\": true/false}. '
+    '{"unsourced_objects": ["short description", ...], "pass": true/false}. '
     "pass=false if unsourced_objects is non-empty. No other text."
 )
 
@@ -149,7 +159,7 @@ def generate_and_verify_image(prompt, client, max_attempts=MAX_IMAGE_ATTEMPTS):
                 + "\n\nSTRICT CORRECTION: a previous attempt at this exact prompt incorrectly added: "
                 + ", ".join(unsourced)
                 + ". Do NOT include any of these in this image. Hands must be empty unless a held item is "
-                "explicitly named above."
+                "explicitly named above. Do not add any people or figures unless explicitly named above."
             )
 
     return last_image_bytes, current_prompt, verification_log
@@ -266,9 +276,10 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
     Stores in entity_appearances (keyed on floor_id, with book_id carried along from the floor's
     starting book for display/legacy purposes); also keeps entities.image_url updated for backward compat.
     Every generated image is checked against its own prompt by a second vision model call before being
-    accepted; images that add unsourced objects (most commonly weapons) get up to MAX_IMAGE_ATTEMPTS
-    retries with an explicit correction appended. The full verification history is stored per appearance
-    so failures are auditable even when a retry doesn't fully resolve them.
+    accepted; images that add unsourced objects (most commonly weapons) or unsourced people (most commonly
+    generic background figures in location/environment images) get up to MAX_IMAGE_ATTEMPTS retries with an
+    explicit correction clause. The full verification history is stored per appearance so failures are
+    auditable even when a retry doesn't fully resolve them.
     """
     run_migrate(conn)
     run_id = log_run_start(conn, "images", {"batch_size": batch_size})
