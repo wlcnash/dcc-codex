@@ -31,17 +31,6 @@
       <span class="font-mono-sys text-gray-800 text-xs tracking-widest">NO IMAGE GENERATED</span>
     </div>
     {% endif %}
-
-    {% if entity.image_prompt %}
-    <details class="mt-3">
-      <summary class="font-mono-sys text-xs text-gray-700 cursor-pointer hover:text-gray-500 tracking-wide transition">
-        VIEW GENERATION PROMPT
-      </summary>
-      <p class="mt-2 text-xs text-gray-700 leading-relaxed italic border-l border-gray-800 pl-3">
-        {{ entity.image_prompt }}
-      </p>
-    </details>
-    {% endif %}
   </div>
 
   <!-- Meta column -->
@@ -54,7 +43,7 @@
           {{ entity.entity_type.value }}
         </span>
         {% if entity.species %}
-        <span class="px-3 py-1 rounded bg-teal-950 text-teal-400 font-mono-sys text-xs tracking-wide" title="{{ entity.species.description }}">
+        <span class="px-3 py-1 rounded bg-teal-950 text-teal-400 font-mono-sys text-xs tracking-wide">
           {{ entity.species.name }}
         </span>
         {% endif %}
@@ -65,12 +54,26 @@
       <h1 class="font-display text-4xl md:text-5xl font-bold text-gold tracking-wide leading-tight">
         {{ entity.name }}
       </h1>
-      {% if entity.aliases %}
-      <div class="flex flex-wrap gap-2 mt-2">
-        {% for alias in entity.aliases %}
+      {% if aliases_shown %}
+      <div class="flex flex-wrap items-center gap-2 mt-2">
+        {% for alias in aliases_shown %}
         <span class="text-xs text-gray-600 bg-gray-900 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
         {% endfor %}
+        {% if aliases_rest %}
+        <details class="inline">
+          <summary class="text-xs text-gray-700 hover:text-gray-500 cursor-pointer font-mono-sys list-none underline underline-offset-2 decoration-dotted">
+            +{{ aliases_rest|length }} more
+          </summary>
+        </details>
+        {% endif %}
       </div>
+      {% if aliases_rest %}
+      <div class="flex flex-wrap gap-2 mt-2">
+        {% for alias in aliases_rest %}
+        <span class="text-xs text-gray-700 bg-gray-950 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% endif %}
     </div>
 
@@ -127,13 +130,57 @@
           {% endif %}
         </span>
       </div>
-      {% if passages_by_type.get('physical') %}
-      <div class="flex gap-3 items-baseline">
-        <span class="font-mono-sys text-gray-700 text-xs tracking-wide w-32 flex-shrink-0 uppercase">Physical Refs</span>
-        <span class="text-gray-400 tabular-nums">{{ passages_by_type['physical']|length }} passages</span>
-      </div>
-      {% endif %}
     </div>
+
+    <!-- Stats / Skills infobox (only verified rows -- see entity_stats/entity_skills verify_pass1/verify_pass2) -->
+    {% if stat_rows or skill_rows %}
+    <div class="dungeon-card rounded-lg p-4 text-sm mb-5">
+      <div class="font-mono-sys text-xs text-gray-700 tracking-widest mb-3 uppercase">Stats &amp; Skills</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {% if stat_rows %}
+        <div>
+          <table class="w-full text-xs">
+            <tbody>
+              {% for stat_name, value, value_type, reason in stat_rows %}
+              <tr class="border-b border-gray-900 last:border-0">
+                <td class="py-1.5 pr-2 text-gray-500 font-mono-sys">{{ stat_name }}</td>
+                <td class="py-1.5 text-gray-300 tabular-nums" title="{{ reason }}">
+                  {% if value is none %}
+                  <span class="text-gray-700">?</span>
+                  {% else %}
+                  {{ '+' if value_type == 'delta' and value > 0 }}{{ value }}
+                  <span class="text-gray-700">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+        {% if skill_rows %}
+        <div>
+          <table class="w-full text-xs">
+            <tbody>
+              {% for skill_name, level, value_type, reason in skill_rows %}
+              <tr class="border-b border-gray-900 last:border-0">
+                <td class="py-1.5 pr-2 text-gray-500 font-mono-sys">{{ skill_name }}</td>
+                <td class="py-1.5 text-gray-300 tabular-nums" title="{{ reason }}">
+                  {% if level is none %}
+                  <span class="text-gray-700">?</span>
+                  {% else %}
+                  Lv. {{ level }}{{ ' (bonus)' if value_type == 'delta' else '' }}
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
 
     <!-- Relationships -->
     {% if relationships %}
@@ -176,77 +223,85 @@
 {% for ptype in passage_type_order %}{% if ptype in passages_by_type %}{% set ns.has_any = true %}{% endif %}{% endfor %}
 
 {% if ns.has_any %}
-<div class="space-y-12">
-  {% for ptype in passage_type_order %}
-  {% if ptype in passages_by_type %}
-  {% set type_passages = passages_by_type[ptype] %}
-  <section>
-    <div class="flex items-center gap-4 mb-5">
-      <h2 class="font-display text-xl text-gold tracking-wide">
-        {% if ptype == 'physical' %}Physical Description
-        {% elif ptype == 'personality' %}Personality
-        {% elif ptype == 'backstory' %}Backstory & Origin
-        {% elif ptype == 'ability' %}Abilities & Powers
-        {% elif ptype == 'action' %}Notable Actions
-        {% else %}Other Mentions{% endif %}
-      </h2>
-      <span class="font-mono-sys text-xs text-gray-800 tabular-nums">
-        {{ type_passages|length }} passage{{ 's' if type_passages|length != 1 }}
-      </span>
-      <div class="flex-1 h-px bg-gray-900"></div>
-    </div>
+<details class="mb-8">
+  <summary class="font-display text-lg text-gold tracking-wide cursor-pointer select-none flex items-center gap-3 py-2 border-t border-gray-900 pt-6">
+    <span>▸ Source Passages</span>
+    <span class="font-mono-sys text-xs text-gray-700 tabular-nums">{{ total_passage_count }}</span>
+    <span class="flex-1 h-px bg-gray-900"></span>
+  </summary>
 
-    <div class="space-y-4">
-      {% for item in type_passages %}
-      {% set passage = item.passage %}
-      {% set chapter = item.chapter %}
-      {% set book    = item.book %}
-      <div class="dungeon-card rounded-lg p-5">
-
-        <!-- Source citation -->
-        <div class="font-mono-sys text-xs text-gray-700 mb-3 flex flex-wrap items-center gap-1.5 tracking-wide">
-          <span class="text-gray-800">BOOK {{ book.book_number }}</span>
-          <span class="text-gray-800">·</span>
-          <em class="not-italic text-gray-700">{{ book.title }}</em>
-          <span class="text-gray-800">·</span>
-          {% if chapter.chapter_title %}
-          {% if chapter.url %}
-          <a href="{{ chapter.url }}" target="_blank" rel="noopener noreferrer"
-             class="hover:text-gold transition">{{ chapter.chapter_title }}</a>
-          {% else %}
-          <span>{{ chapter.chapter_title }}</span>
-          {% endif %}
-          {% else %}
-          <span>CH. {{ chapter.chapter_number }}</span>
-          {% endif %}
-        </div>
-
-        <!-- Context before -->
-        {% if passage.context_before %}
-        <p class="text-gray-700 text-sm italic leading-relaxed mb-2 pl-4 border-l border-gray-900">
-          …{{ passage.context_before }}
-        </p>
-        {% endif %}
-
-        <!-- The passage -->
-        <blockquote class="passage-quote">
-          {{ passage.passage_text }}
-        </blockquote>
-
-        <!-- Context after -->
-        {% if passage.context_after %}
-        <p class="text-gray-700 text-sm italic leading-relaxed mt-2 pl-4 border-l border-gray-900">
-          {{ passage.context_after }}…
-        </p>
-        {% endif %}
-
+  <div class="space-y-12 mt-6">
+    {% for ptype in passage_type_order %}
+    {% if ptype in passages_by_type %}
+    {% set type_passages = passages_by_type[ptype] %}
+    <section>
+      <div class="flex items-center gap-4 mb-5">
+        <h2 class="font-display text-xl text-gold tracking-wide">
+          {% if ptype == 'physical' %}Physical Description
+          {% elif ptype == 'personality' %}Personality
+          {% elif ptype == 'backstory' %}Backstory & Origin
+          {% elif ptype == 'ability' %}Abilities & Powers
+          {% elif ptype == 'action' %}Notable Actions
+          {% else %}Other Mentions{% endif %}
+        </h2>
+        <span class="font-mono-sys text-xs text-gray-800 tabular-nums">
+          {{ type_passages|length }} passage{{ 's' if type_passages|length != 1 }}
+        </span>
+        <div class="flex-1 h-px bg-gray-900"></div>
       </div>
-      {% endfor %}
-    </div>
-  </section>
-  {% endif %}
-  {% endfor %}
-</div>
+
+      <div class="space-y-4">
+        {% for item in type_passages %}
+        {% set passage = item.passage %}
+        {% set chapter = item.chapter %}
+        {% set book    = item.book %}
+        <div class="dungeon-card rounded-lg p-5">
+
+          <!-- Source citation -->
+          <div class="font-mono-sys text-xs text-gray-700 mb-3 flex flex-wrap items-center gap-1.5 tracking-wide">
+            <span class="text-gray-800">BOOK {{ book.book_number }}</span>
+            <span class="text-gray-800">·</span>
+            <em class="not-italic text-gray-700">{{ book.title }}</em>
+            <span class="text-gray-800">·</span>
+            {% if chapter.chapter_title %}
+            {% if chapter.url %}
+            <a href="{{ chapter.url }}" target="_blank" rel="noopener noreferrer"
+               class="hover:text-gold transition">{{ chapter.chapter_title }}</a>
+            {% else %}
+            <span>{{ chapter.chapter_title }}</span>
+            {% endif %}
+            {% else %}
+            <span>CH. {{ chapter.chapter_number }}</span>
+            {% endif %}
+          </div>
+
+          <!-- Context before -->
+          {% if passage.context_before %}
+          <p class="text-gray-700 text-sm italic leading-relaxed mb-2 pl-4 border-l border-gray-900">
+            …{{ passage.context_before }}
+          </p>
+          {% endif %}
+
+          <!-- The passage -->
+          <blockquote class="passage-quote">
+            {{ passage.passage_text }}
+          </blockquote>
+
+          <!-- Context after -->
+          {% if passage.context_after %}
+          <p class="text-gray-700 text-sm italic leading-relaxed mt-2 pl-4 border-l border-gray-900">
+            {{ passage.context_after }}…
+          </p>
+          {% endif %}
+
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+    {% endfor %}
+  </div>
+</details>
 
 {% else %}
 <div class="text-center py-20 text-gray-800">
