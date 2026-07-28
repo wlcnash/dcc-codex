@@ -113,6 +113,31 @@ CREATE INDEX idx_relationships_a ON entity_relationships(entity_a_id);
 CREATE INDEX idx_relationships_b ON entity_relationships(entity_b_id);
 
 -- ─────────────────────────────────────────────
+-- Entity merge audit log (added 2026-07-27)
+-- Every entity merge (dedup) must write a row here BEFORE the losing row is
+-- deleted, via seeder/merge_entities.py. old_entity_id is intentionally NOT
+-- a foreign key to entities(id) -- the whole point is the old row gets
+-- deleted, and a FK there would either cascade-delete this log entry (defeats
+-- the purpose) or block the delete. This is a permanent historical record,
+-- not a live-referential table.
+-- ─────────────────────────────────────────────
+
+CREATE TABLE entity_merge_log (
+    id SERIAL PRIMARY KEY,
+    old_entity_id INTEGER NOT NULL,
+    old_name TEXT NOT NULL,
+    old_entity_type TEXT NOT NULL,
+    old_aliases TEXT[],
+    canonical_entity_id INTEGER NOT NULL,
+    canonical_name_at_merge TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    merged_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX idx_merge_log_canonical ON entity_merge_log(canonical_entity_id);
+CREATE INDEX idx_merge_log_old ON entity_merge_log(old_entity_id);
+
+-- ─────────────────────────────────────────────
 -- Full-text search view
 -- ─────────────────────────────────────────────
 
