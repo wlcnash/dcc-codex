@@ -4,14 +4,14 @@
 {% block content %}
 
 <!-- Breadcrumb -->
-<nav class="text-xs font-mono-sys text-gray-500 mb-8 flex items-center gap-2 tracking-wide">
+<nav class="text-xs font-mono-sys text-gray-400 mb-8 flex items-center gap-2 tracking-wide">
   <a href="/" class="hover:text-gold transition">HOME</a>
   <span class="text-gray-600">›</span>
   <a href="/browse?entity_type={{ entity.entity_type.value }}" class="hover:text-gold transition uppercase">
     {{ entity_type_labels.get(entity.entity_type.value, entity.entity_type.value) }}
   </a>
   <span class="text-gray-600">›</span>
-  <span class="text-gray-500">{{ entity.name }}</span>
+  <span class="text-gray-400">{{ entity.name }}</span>
 </nav>
 
 <!-- Header block -->
@@ -28,7 +28,7 @@
     {% else %}
     <div class="w-full aspect-square rounded-xl border border-gray-900 bg-gray-950 flex flex-col items-center justify-center">
       <span class="text-5xl mb-3 opacity-20">{{ entity_type_icons[entity.entity_type.value] }}</span>
-      <span class="font-mono-sys text-gray-600 text-xs tracking-widest">NO IMAGE GENERATED</span>
+      <span class="font-mono-sys text-gray-400 text-xs tracking-widest">NO IMAGE GENERATED</span>
     </div>
     {% endif %}
   </div>
@@ -43,53 +43,52 @@
           {{ entity.entity_type.value }}
         </span>
         {% if entity.species %}
-        <span class="px-3 py-1 rounded bg-teal-950 text-teal-400 font-mono-sys text-xs tracking-wide">
+        <span class="px-3 py-1 rounded bg-[#0f2340] text-[#6baed6] font-mono-sys text-xs tracking-wide">
           {{ entity.species.name }}
         </span>
         {% endif %}
         {% if entity.is_major %}
-        <span class="text-yellow-700 text-xs font-mono-sys tracking-widest">★ MAJOR</span>
+        <span class="text-gold text-xs font-mono-sys tracking-widest">★ MAJOR</span>
         {% endif %}
       </div>
       <h1 class="font-display text-4xl md:text-5xl font-bold text-gold tracking-wide leading-tight">
         {{ entity.name }}
       </h1>
       {% if aliases_shown %}
-      <div class="flex flex-wrap items-center gap-2 mt-2">
-        {% for alias in aliases_shown %}
-        <span class="text-xs text-gray-600 bg-gray-900 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
-        {% endfor %}
-      </div>
-      {% if aliases_rest %}
-      <details class="mt-2">
-        <summary class="text-xs text-gray-500 hover:text-gray-500 cursor-pointer font-mono-sys list-none underline underline-offset-2 decoration-dotted">
-          +{{ aliases_rest|length }} more
-        </summary>
-        <div class="flex flex-wrap gap-2 mt-2">
-          {% for alias in aliases_rest %}
-          <span class="text-xs text-gray-500 bg-gray-950 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
-          {% endfor %}
-        </div>
-      </details>
-      {% endif %}
+      <!-- 2026-07-28 aesthetic pass: aliases were previously individually-bordered pills --
+           fine for 3-4 items, but Carl alone has 62, so it read as a wall of AI-dashboard
+           "tag chips." Switched to a plain, middot-separated text line, which is how a
+           real print glossary/wiki lists alternate names -- lower visual weight for a
+           genuinely secondary piece of info, and no longer competes with the entity_type
+           badges above it for attention. -->
+      <p class="text-xs text-gray-400 font-mono-sys mt-2 leading-relaxed">
+        {{ aliases_shown|join(' · ') }}
+        {% if aliases_rest %}
+        <span class="mx-1 text-gray-600">·</span>
+        <details class="inline">
+          <summary class="inline text-gray-400 hover:text-gold cursor-pointer list-none underline underline-offset-2 decoration-dotted">+{{ aliases_rest|length }} more</summary>
+          <span>{{ ' · ' }}{{ aliases_rest|join(' · ') }}</span>
+        </details>
+        {% endif %}
+      </p>
       {% endif %}
     </div>
 
     <!-- System AI persona block -->
     {% if entity.persona_text %}
+    <!-- 2026-07-28 aesthetic pass: dropped the 3 fake macOS-traffic-light dots from the
+         header -- a recognizable "AI-generated retro-terminal" cliche (research: this
+         exact decoration is one of the most-cited "looks AI-built" tells) that added
+         nothing functional. The gold monospace label alone still reads as an in-universe
+         system readout without borrowing a real OS's window chrome. -->
     <div class="system-terminal mb-6">
-      <div class="system-terminal-header flex items-center gap-2">
-        <div class="flex gap-1">
-          <div class="w-2 h-2 rounded-full bg-yellow-900"></div>
-          <div class="w-2 h-2 rounded-full bg-yellow-900 opacity-60"></div>
-          <div class="w-2 h-2 rounded-full bg-yellow-900 opacity-30"></div>
-        </div>
-        <span class="font-mono-sys text-xs text-yellow-900 tracking-widest ml-1">
+      <div class="system-terminal-header">
+        <span class="font-mono-sys text-xs text-gold tracking-widest">
           SYSTEM RECORD // {{ entity.entity_type.value|upper }} DATABASE // ID-{{ entity.id }}
         </span>
       </div>
       <div class="system-terminal-body">
-        <p class="text-sm text-yellow-100 text-opacity-70 leading-relaxed" style="color: #d4a847; opacity: 0.85;">
+        <p class="text-sm leading-relaxed" style="color: #d4a847;">
           {{ entity.persona_text }}
         </p>
       </div>
@@ -103,26 +102,26 @@
     <div class="dungeon-card rounded-lg p-4 text-sm mb-5 space-y-2.5">
       {% if first_book %}
       <div class="flex gap-3 items-baseline">
-        <span class="font-mono-sys text-gray-500 text-xs tracking-wide w-32 flex-shrink-0 uppercase">First Appears</span>
+        <span class="font-mono-sys text-gray-400 text-xs tracking-wide w-32 flex-shrink-0 uppercase">First Appears</span>
         <span class="text-gray-400">
           <em class="not-italic">{{ first_book.title }}</em>
           {% if first_chapter %}
-          <span class="text-gray-500 mx-1">·</span>
+          <span class="text-gray-400 mx-1">·</span>
           {% if first_chapter.chapter_title %}
-          <span class="text-gray-500">{{ first_chapter.chapter_title }}</span>
+          <span class="text-gray-400">{{ first_chapter.chapter_title }}</span>
           {% else %}
-          <span class="text-gray-600">Ch. {{ first_chapter.chapter_number }}</span>
+          <span class="text-gray-400">Ch. {{ first_chapter.chapter_number }}</span>
           {% endif %}
           {% endif %}
         </span>
       </div>
       {% endif %}
       <div class="flex gap-3 items-baseline">
-        <span class="font-mono-sys text-gray-500 text-xs tracking-wide w-32 flex-shrink-0 uppercase">Total Passages</span>
+        <span class="font-mono-sys text-gray-400 text-xs tracking-wide w-32 flex-shrink-0 uppercase">Total Passages</span>
         <span class="text-gray-400 tabular-nums">
           {{ visible_count }}
           {% if hidden_count > 0 %}
-          <span class="text-green-800 text-xs font-mono-sys ml-1">
+          <span class="text-gold text-xs font-mono-sys ml-1">
             ({{ hidden_count }} hidden — spoiler shield)
           </span>
           {% endif %}
@@ -133,7 +132,7 @@
     <!-- Stats / Skills infobox (only verified rows -- see entity_stats/entity_skills verify_pass1/verify_pass2) -->
     {% if stat_rows or skill_rows %}
     <div class="dungeon-card rounded-lg p-4 text-sm mb-5">
-      <div class="font-mono-sys text-xs text-gray-500 tracking-widest mb-3 uppercase">Stats &amp; Skills</div>
+      <div class="font-mono-sys text-xs text-gray-400 tracking-widest mb-3 uppercase">Stats &amp; Skills</div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {% if stat_rows %}
         <div>
@@ -141,13 +140,13 @@
             <tbody>
               {% for stat_name, value, value_type, reason in stat_rows %}
               <tr class="border-b border-gray-900 last:border-0">
-                <td class="py-1.5 pr-2 text-gray-500 font-mono-sys">{{ stat_name }}</td>
+                <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">{{ stat_name }}</td>
                 <td class="py-1.5 text-gray-300 tabular-nums" title="{{ reason }}">
                   {% if value is none %}
-                  <span class="text-gray-500">?</span>
+                  <span class="text-gray-400">?</span>
                   {% else %}
                   {{ '+' if value_type == 'delta' and value > 0 }}{{ value }}
-                  <span class="text-gray-500">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
+                  <span class="text-gray-400">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
                   {% endif %}
                 </td>
               </tr>
@@ -162,10 +161,10 @@
             <tbody>
               {% for skill_name, level, value_type, reason in skill_rows %}
               <tr class="border-b border-gray-900 last:border-0">
-                <td class="py-1.5 pr-2 text-gray-500 font-mono-sys">{{ skill_name }}</td>
+                <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">{{ skill_name }}</td>
                 <td class="py-1.5 text-gray-300 tabular-nums" title="{{ reason }}">
                   {% if level is none %}
-                  <span class="text-gray-500">?</span>
+                  <span class="text-gray-400">?</span>
                   {% else %}
                   Lv. {{ level }}{{ ' (bonus)' if value_type == 'delta' else '' }}
                   {% endif %}
@@ -183,13 +182,13 @@
     <!-- Relationships -->
     {% if relationships %}
     <div>
-      <div class="font-mono-sys text-xs text-gray-500 tracking-widest mb-2 uppercase">Known Connections</div>
+      <div class="font-mono-sys text-xs text-gray-400 tracking-widest mb-2 uppercase">Known Connections</div>
       <div class="flex flex-wrap gap-2">
         {% for rel, related_entity in relationships %}
         <a href="/entity/{{ related_entity.slug }}"
-           class="flex items-center gap-1.5 dungeon-card rounded-full px-3 py-1 text-xs transition hover:text-gold">
-          <span class="text-gray-500 capitalize">{{ rel.relation_type }}</span>
-          <span class="text-gray-500">·</span>
+           class="flex items-center gap-1.5 dungeon-card rounded px-3 py-1 text-xs transition hover:text-gold">
+          <span class="text-gray-400 capitalize">{{ rel.relation_type }}</span>
+          <span class="text-gray-400">·</span>
           <span class="text-gray-300">{{ related_entity.name }}</span>
         </a>
         {% endfor %}
@@ -203,12 +202,12 @@
 <!-- Spoiler shield notice (if passages are hidden) -->
 {% if hidden_count > 0 %}
 <div class="spoiler-shield rounded-lg px-5 py-3 mb-10 flex items-center gap-3 text-sm">
-  <span class="text-green-700 text-lg">🛡</span>
+  <span class="text-gold text-lg" aria-hidden="true">🛡</span>
   <div>
-    <span class="font-mono-sys text-green-700 text-xs tracking-widest block mb-0.5">SPOILER SHIELD ACTIVE</span>
-    <span class="text-gray-500 text-xs">
+    <span class="font-mono-sys text-gold text-xs tracking-widest block mb-0.5">SPOILER SHIELD ACTIVE</span>
+    <span class="text-gray-400 text-xs">
       {{ hidden_count }} passage{{ 's' if hidden_count != 1 }} from later books are hidden.
-      <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-green-700 hover:text-green-500 underline underline-offset-2 transition ml-1">
+      <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-gold hover:text-yellow-300 underline underline-offset-2 transition ml-1">
         Clear filter to see all.
       </a>
     </span>
@@ -224,7 +223,7 @@
 <details class="mb-8">
   <summary class="font-display text-lg text-gold tracking-wide cursor-pointer select-none flex items-center gap-3 py-2 border-t border-gray-900 pt-6">
     <span>▸ Source Passages</span>
-    <span class="font-mono-sys text-xs text-gray-500 tabular-nums">{{ total_passage_count }}</span>
+    <span class="font-mono-sys text-xs text-gray-400 tabular-nums">{{ total_passage_count }}</span>
     <span class="flex-1 h-px bg-gray-900"></span>
   </summary>
 
@@ -242,7 +241,7 @@
           {% elif ptype == 'action' %}Notable Actions
           {% else %}Other Mentions{% endif %}
         </h2>
-        <span class="font-mono-sys text-xs text-gray-600 tabular-nums">
+        <span class="font-mono-sys text-xs text-gray-400 tabular-nums">
           {{ type_passages|length }} passage{{ 's' if type_passages|length != 1 }}
         </span>
         <div class="flex-1 h-px bg-gray-900"></div>
@@ -256,10 +255,10 @@
         <div class="dungeon-card rounded-lg p-5">
 
           <!-- Source citation -->
-          <div class="font-mono-sys text-xs text-gray-500 mb-3 flex flex-wrap items-center gap-1.5 tracking-wide">
-            <span class="text-gray-600">BOOK {{ book.book_number }}</span>
+          <div class="font-mono-sys text-xs text-gray-400 mb-3 flex flex-wrap items-center gap-1.5 tracking-wide">
+            <span class="text-gray-400">BOOK {{ book.book_number }}</span>
             <span class="text-gray-600">·</span>
-            <em class="not-italic text-gray-500">{{ book.title }}</em>
+            <em class="not-italic text-gray-400">{{ book.title }}</em>
             <span class="text-gray-600">·</span>
             {% if chapter.chapter_title %}
             {% if chapter.url %}
@@ -275,7 +274,7 @@
 
           <!-- Context before -->
           {% if passage.context_before %}
-          <p class="text-gray-500 text-sm italic leading-relaxed mb-2 pl-4 border-l border-gray-900">
+          <p class="text-gray-400 text-sm italic leading-relaxed mb-2 pl-4 border-l border-gray-900">
             …{{ passage.context_before }}
           </p>
           {% endif %}
@@ -287,7 +286,7 @@
 
           <!-- Context after -->
           {% if passage.context_after %}
-          <p class="text-gray-500 text-sm italic leading-relaxed mt-2 pl-4 border-l border-gray-900">
+          <p class="text-gray-400 text-sm italic leading-relaxed mt-2 pl-4 border-l border-gray-900">
             {{ passage.context_after }}…
           </p>
           {% endif %}
@@ -302,10 +301,10 @@
 </details>
 
 {% else %}
-<div class="text-center py-20 text-gray-600">
+<div class="text-center py-20 text-gray-400">
   <div class="font-mono-sys text-xs tracking-widest mb-2">NO PASSAGES AVAILABLE</div>
   {% if max_floor %}
-  <p class="text-xs text-gray-600">Spoiler shield may be filtering all passages. <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-green-900 hover:text-green-700 underline underline-offset-2">Clear filter.</a></p>
+  <p class="text-xs text-gray-400">Spoiler shield may be filtering all passages. <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-gold-dim hover:text-gold underline underline-offset-2">Clear filter.</a></p>
   {% endif %}
 </div>
 {% endif %}
