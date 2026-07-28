@@ -37,7 +37,7 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 RATE_LIMIT_SECONDS = 1.0
-MAX_OUTPUT_TOKENS = 2048
+MAX_OUTPUT_TOKENS = 4096
 
 # The voice: Dungeon System AI — omniscient dungeon announcer, treats everything as metrics,
 # bureaucratic corporate-speak crossed with reality-TV energy, slightly ominous.
