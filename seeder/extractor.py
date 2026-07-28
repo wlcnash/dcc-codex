@@ -2,11 +2,19 @@
 Gemini-powered entity and passage extractor for DCC Codex.
 
 For each chapter, asks Gemini Flash to:
-1. Identify named entities (characters, creatures, items, locations, abilities, factions)
+1. Identify named entities (crawlers, NPCs, mobs, items, locations, floors,
+   abilities, factions, deities, and in-universe media segments)
 2. Extract exact passages that describe each entity's physical appearance
 3. Return structured JSON
 
-Entity deduplication is handled by normalizing names and checking the DB.
+Entity deduplication is a TWO-STEP process, not simple name normalization:
+  1. upsert_entity() first checks for an EXACT name/alias string match.
+  2. If no exact match, seeder/entity_resolution.py runs a content-grounded
+     resolution pass (loose trigram candidate search + LLM judgment reading
+     actual descriptive text on both sides) BEFORE any new entity row is
+     created. See entity_resolution.py's module docstring and
+     ENTITY_RESOLUTION_POLICY.md for why exact-match-only was not sufficient
+     and must never be reverted to.
 """
 
 import json
@@ -19,15 +27,59 @@ from psycopg2.extras import execute_values
 from google import genai
 from google.genai import types
 
+from entity_resolution import resolve_entity, backfill_resulting_entity_id
+
 logger = logging.getLogger(__name__)
 
-VALID_ENTITY_TYPES = {"character", "creature", "item", "location", "floor", "ability", "faction", "other"}
+# Must match the live `entity_type` Postgres enum exactly (verified 2026-07-28
+# via \d entities -- see ENTITY_RESOLUTION_POLICY.md). "species" is NOT a
+# member: it was split out into its own `species` table with entities.species_id
+# FK during an earlier migration and is populated by a separate backfill job,
+# not by this extractor. If this set and the live enum ever drift again, every
+# chapter mentioning a type this set is missing will fail extraction with a
+# Postgres invalid-enum-value error on every entity of that type.
+VALID_ENTITY_TYPES = {
+    "crawler", "npc", "mob", "item", "ability", "location",
+    "floor", "faction", "deity", "media", "other",
+}
 VALID_PASSAGE_TYPES = {"physical", "personality", "backstory", "ability", "action", "other"}
+
+ENTITY_TYPE_DEFINITIONS = """
+- crawler: an individual competitor entered into the dungeon crawl reality show (e.g. Carl,
+  Donut, any other named crawler, human or alien).
+- npc: a non-crawler character who is not a hostile monster -- dungeon-created NPCs, guild
+  staff, sponsors, show hosts/announcers/producers, AI overseers (e.g. Mordecai, Odette,
+  "the AI", "system AI"). A single named individual, not a group.
+- mob: a hostile or neutral creature/monster crawlers fight or encounter in the dungeon
+  (goblins, ogres, generic monster types, dungeon-born beasts). Not a named crawler or NPC.
+- item: a weapon, piece of armor, gear, or other object.
+- ability: a skill, spell, feat, curse, or magical effect.
+- location: a place (not a numbered dungeon floor -- see "floor" below).
+- floor: a specific numbered dungeon floor.
+- faction: an organized group -- corporation, guild, military unit, political power, or
+  crawler team/party (e.g. Borant, the Blood Sultanate). Not a species/race, even if the
+  group is composed of one species.
+- deity: a sponsoring god/Patron that grants power to crawlers in the Patron system (e.g.
+  Donar, Taranis, The Dagda).
+- media: an in-universe broadcast segment, TV show, publicity event, or programming block
+  within the galaxy-wide reality show (e.g. Crawl Con, The Recital, Escape Velocity).
+- other: only if none of the above genuinely fit.
+
+Do NOT use "character" or "creature" -- those are not valid types in this system. A
+race/species classification (e.g. Kua-Tin, gnoll) is not extracted as its own entity type
+here; if a species/race is mentioned as an entity in its own right, use "other" and it will
+be reviewed separately -- do not invent a "species" entity_type value, it does not exist in
+this database.
+"""
 
 # Note: {{ and }} are escaped braces for str.format(); {chapter_text} is the real placeholder
 EXTRACTION_PROMPT = """You are a precise literary analyst processing the LitRPG web novel "Dungeon Crawler Carl."
 
-Analyze the chapter text below and extract ALL named entities — characters, creatures, items, locations, floors, abilities, and factions.
+Analyze the chapter text below and extract ALL named entities: crawlers, NPCs, mobs, items,
+locations, floors, abilities, factions, deities, and in-universe media segments.
+
+Entity type definitions (choose exactly one entity_type per entity from this list):
+{entity_type_definitions}
 
 For each entity, identify passages from the text that describe:
 - Physical appearance (most important — size, color, shape, materials, anatomy, AND current clothing/gear/equipment status,
@@ -61,7 +113,7 @@ Return a JSON object matching this exact schema:
   "entities": [
     {{
       "name": "string (canonical name)",
-      "entity_type": "character|creature|item|location|floor|ability|faction|other",
+      "entity_type": "crawler|npc|mob|item|ability|location|floor|faction|deity|media|other",
       "aliases": ["list of alternate names used in this chapter"],
       "is_major": true/false,
       "passages": [
@@ -80,7 +132,7 @@ Only return the JSON object, no other text.
 
 CHAPTER TEXT:
 {chapter_text}
-"""
+""".replace("{entity_type_definitions}", ENTITY_TYPE_DEFINITIONS)
 
 RATE_LIMIT_SECONDS = 1.0  # Gemini Flash has generous rate limits
 
@@ -100,7 +152,7 @@ def extract_from_chapter(chapter_text: str, client) -> Optional[dict]:
 
     try:
         response = client.models.generate_content(
-            model="gemini-3.5-flash",
+            model="gemini-3.6-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -114,8 +166,27 @@ def extract_from_chapter(chapter_text: str, client) -> Optional[dict]:
         return None
 
 
-def upsert_entity(cur, entity_data: dict, first_book_id: int, first_chapter_id: int) -> Optional[int]:
-    """Insert or update an entity. Returns entity_id. Raises on DB error (caller uses savepoint)."""
+def upsert_entity(cur, entity_data: dict, first_book_id: int, first_chapter_id: int, client=None) -> Optional[int]:
+    """
+    Insert or update an entity. Returns entity_id. Raises on DB error (caller
+    uses savepoint).
+
+    Resolution order (per ENTITY_RESOLUTION_POLICY.md -- do not reorder or
+    skip a step):
+      1. Exact name/alias string match (cheap, no LLM call, catches the
+         common case of the same entity mentioned identically again).
+      2. If no exact match AND a client is provided: content-grounded
+         resolution via entity_resolution.resolve_entity() (trigram
+         candidate search + LLM judgment against actual passage content).
+         This is what catches same entity/different wording cases like
+         "Katia" vs "Katia Grimmsdottir".
+      3. Only if both of the above find nothing: create a brand-new row.
+
+    `client` is optional ONLY so this function stays testable/callable
+    without a live Gemini client; in every real extraction code path
+    (run_extractor, run_extractor_forced) it MUST be passed. Skipping step 2
+    silently reintroduces the exact bug class this module exists to prevent.
+    """
     name = entity_data["name"].strip()
     if not name:
         return None
@@ -128,7 +199,7 @@ def upsert_entity(cur, entity_data: dict, first_book_id: int, first_chapter_id: 
     aliases = entity_data.get("aliases", [])
     is_major = entity_data.get("is_major", False)
 
-    # Try to find existing entity by name or alias
+    # Step 1: exact match
     cur.execute(
         "SELECT id FROM entities WHERE name = %s OR %s = ANY(aliases)",
         (name, name),
@@ -136,7 +207,6 @@ def upsert_entity(cur, entity_data: dict, first_book_id: int, first_chapter_id: 
     row = cur.fetchone()
     if row:
         entity_id = row[0]
-        # Update aliases if new ones found
         if aliases:
             cur.execute(
                 "UPDATE entities SET aliases = array(SELECT DISTINCT unnest(aliases || %s::text[])) WHERE id = %s",
@@ -144,7 +214,21 @@ def upsert_entity(cur, entity_data: dict, first_book_id: int, first_chapter_id: 
             )
         return entity_id
 
-    # Ensure slug is unique by appending a counter if needed
+    # Step 2: content-grounded resolution against near-name-matches of the
+    # same type, before ever creating a new row.
+    pending_log_ids = []
+    if client is not None:
+        merge_into_id, pending_log_ids = resolve_entity(cur, client, entity_data, entity_type)
+        if merge_into_id is not None:
+            return merge_into_id
+    else:
+        logger.warning(
+            "upsert_entity called with client=None -- skipping content-grounded "
+            "resolution for %r. This should only happen in tests; every real "
+            "extraction path must pass a client.", name,
+        )
+
+    # Step 3: no match found (or resolution unavailable) -- create new row.
     base_slug = slug
     counter = 1
     while True:
@@ -166,7 +250,12 @@ def upsert_entity(cur, entity_data: dict, first_book_id: int, first_chapter_id: 
         (name, slug, entity_type, aliases, first_book_id, first_chapter_id, is_major),
     )
     row = cur.fetchone()
-    return row[0] if row else None
+    entity_id = row[0] if row else None
+
+    if entity_id is not None and pending_log_ids:
+        backfill_resulting_entity_id(cur, pending_log_ids, entity_id)
+
+    return entity_id
 
 
 def insert_passages(cur, entity_id: int, chapter_id: int, passages: list[dict]):
@@ -259,7 +348,7 @@ def run_extractor(conn, gemini_api_key: str, batch_size: int = 10):
             # Use a savepoint per entity so one failure doesn't abort the chapter's transaction
             try:
                 cur.execute("SAVEPOINT sp_entity")
-                entity_id = upsert_entity(cur, entity_data, book_id, chap_id)
+                entity_id = upsert_entity(cur, entity_data, book_id, chap_id, client=client)
                 if entity_id is None:
                     cur.execute("RELEASE SAVEPOINT sp_entity")
                     continue
@@ -318,7 +407,7 @@ def run_extractor_forced(conn, gemini_api_key: str, chapter_ids: list[int]):
         for entity_data in result["entities"]:
             try:
                 cur.execute("SAVEPOINT sp_entity")
-                entity_id = upsert_entity(cur, entity_data, book_id, chap_id)
+                entity_id = upsert_entity(cur, entity_data, book_id, chap_id, client=client)
                 if entity_id is None:
                     cur.execute("RELEASE SAVEPOINT sp_entity")
                     continue
