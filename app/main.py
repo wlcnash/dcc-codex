@@ -5,7 +5,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 import boto3
 from botocore.config import Config
 from database import get_db, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
@@ -40,16 +40,27 @@ def get_minio_client():
 def resolve_entity_image_key(slug: str, max_floor, db: Session):
     """Return the MinIO key for an entity image given the user floor context.
     Checks entity_appearances for the highest floor <= max_floor.
-    Falls back to legacy entities/{slug}.jpg."""
-    if max_floor is not None:
-        entity = db.query(Entity).filter(Entity.slug == slug).first()
-        if entity:
-            appearance = (db.query(EntityAppearance)
-                .join(Floor, EntityAppearance.floor_id == Floor.id)
-                .filter(EntityAppearance.entity_id == entity.id, Floor.floor_number <= max_floor, EntityAppearance.image_url.isnot(None))
-                .order_by(Floor.floor_number.desc()).first())
-            if appearance:
-                return f"entities/{slug}/floor_{appearance.floor.floor_number}.jpg"
+
+    2026-07-28 fix: previously, when no floor cookie was set (max_floor is None),
+    this skipped entity_appearances entirely and fell straight to the legacy
+    entities/{slug}.jpg blob -- meaning every first-time visitor with no floor
+    selected saw the OLDEST, unverified image, while all the floor-scoped work
+    (verified against actual passage descriptions) sat unused behind a filter
+    nobody sets by default. Now, with no floor selected, we default to the
+    EARLIEST available floor-scoped appearance (the least-spoiler choice) instead
+    of the legacy fallback. Legacy fallback is now reserved for entities with no
+    floor-scoped appearance at all."""
+    entity = db.query(Entity).filter(Entity.slug == slug).first()
+    if entity:
+        appearance_q = (db.query(EntityAppearance)
+            .join(Floor, EntityAppearance.floor_id == Floor.id)
+            .filter(EntityAppearance.entity_id == entity.id, EntityAppearance.image_url.isnot(None)))
+        if max_floor is not None:
+            appearance = appearance_q.filter(Floor.floor_number <= max_floor).order_by(Floor.floor_number.desc()).first()
+        else:
+            appearance = appearance_q.order_by(Floor.floor_number.asc()).first()
+        if appearance:
+            return f"entities/{slug}/floor_{appearance.floor.floor_number}.jpg"
     return f"entities/{slug}.jpg"
 
 @app.get("/health")
@@ -155,12 +166,36 @@ def entity_detail(slug: str, request: Request, db: Session=Depends(get_db)):
             .order_by(Floor.floor_number.desc()).first())
     relationships = (db.query(EntityRelationship, Entity).join(Entity, EntityRelationship.entity_b_id==Entity.id).filter(EntityRelationship.entity_a_id==entity.id).all() +
                      db.query(EntityRelationship, Entity).join(Entity, EntityRelationship.entity_a_id==Entity.id).filter(EntityRelationship.entity_b_id==entity.id).all())
+
+    # Verified stats/skills only -- see seeder/verify_stats.py. A row is trustworthy
+    # for public display only once BOTH independent verification passes confirmed it;
+    # unverified/flagged rows are never shown on the page.
+    stat_rows = db.execute(text("""
+        SELECT stat_name, value, value_type, reason
+        FROM entity_stats
+        WHERE entity_id = :eid AND verify_pass1 = true AND verify_pass2 = true
+        ORDER BY stat_name
+    """), {"eid": entity.id}).fetchall()
+    skill_rows = db.execute(text("""
+        SELECT skill_name, level, value_type, reason
+        FROM entity_skills
+        WHERE entity_id = :eid AND verify_pass1 = true AND verify_pass2 = true
+        ORDER BY skill_name
+    """), {"eid": entity.id}).fetchall()
+
+    # Curate aliases: show a handful up front, rest behind a "+N more" toggle in the template
+    aliases = entity.aliases or []
+    aliases_shown = aliases[:8]
+    aliases_rest = aliases[8:]
+
     ctx.update({"entity": entity, "passages_by_type": passages_by_type,
                 "passage_type_order": ["physical","personality","ability","backstory","action","other"],
                 "relationships": relationships, "first_book": entity.first_book, "first_chapter": entity.first_chapter,
                 "entity_type_labels": ENTITY_TYPE_LABELS,
                 "hidden_count": total_passage_count-len(passages), "visible_count": len(passages),
-                "total_passage_count": total_passage_count, "current_appearance": current_appearance})
+                "total_passage_count": total_passage_count, "current_appearance": current_appearance,
+                "stat_rows": stat_rows, "skill_rows": skill_rows,
+                "aliases_shown": aliases_shown, "aliases_rest": aliases_rest})
     return templates.TemplateResponse("entity_detail.html", ctx)
 
 @app.get("/api/search")
