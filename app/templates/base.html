@@ -68,16 +68,18 @@
     }
     .dungeon-card:hover { border-color: var(--dungeon-border-hover); }
 
-    /* Type badges -- consolidated 2026-07-28 (aesthetic pass) from 11 uncoordinated neon
-       hues down to 4 deliberate tones grounded in the site's own gold identity. Distinguish
-       type via color-family + the existing per-type icon, not via a different saturated
-       color per row. All 4 pairs verified >=4.5:1 (WCAG AA). */
-    .badge-crawler, .badge-item, .badge-ability, .badge-deity, .badge-media
-      { background: #2e2408; color: #d4af37; }             /* warm/gold family: protagonist-adjacent */
-    .badge-npc, .badge-faction, .badge-floor, .badge-location
-      { background: #0f2340; color: #6baed6; }             /* cool slate family: neutral/informational */
-    .badge-mob       { background: #2d0d0d; color: #c97070; } /* single muted red: danger */
-    .badge-other     { background: #1a1a1a; color: #9ca3af; } /* neutral gray: catch-all */
+    /* Type labels -- round 3 (2026-07-28): the round-2 fix consolidated 11 neon hues down
+       to 4 filled color chips, but a filled-background rounded tag is itself a named "AI
+       slop" tell (colored pill/chip labels), independent of which color fills it. Research
+       on Linear's and Bloomberg Terminal's UI language: both use color ON TEXT to carry
+       meaning, never a decorative filled container -- hairline borders and plain colored
+       type do the work that a "badge" UI-kit component usually does. Dropped the background
+       fill entirely; type is now distinguished by color + a middot separator in the
+       surrounding markup, not by a box. */
+    .badge-crawler, .badge-item, .badge-ability, .badge-deity, .badge-media { color: #d4af37; }  /* warm/gold family */
+    .badge-npc, .badge-faction, .badge-floor, .badge-location { color: #6baed6; }                /* cool slate family */
+    .badge-mob   { color: #c97070; } /* single muted red: danger */
+    .badge-other { color: #9ca3af; } /* neutral gray: catch-all */
 
     /* System AI terminal block */
     .system-terminal {
@@ -114,14 +116,25 @@
     }
     .passage-quote:hover { border-left-color: var(--gold); }
 
-    /* Spoiler shield banner -- recolored 2026-07-28 from an unrelated neon-green
-       "hacker terminal" accent to the site's own warm/gold System AI family, so this
-       reads as the same in-universe voice as the persona box instead of a second,
-       competing invented sub-theme. */
+    /* Spoiler shield banner -- round 2 (2026-07-28) recolored this from neon-green to gold
+       but kept a colored 3px left-border accent strip, which research identifies as its own
+       independent "AI slop" tell (the single most common one on stat cards/callouts),
+       regardless of color. Round 3: dropped the accent stripe and the filled background
+       entirely -- this is now a plain hairline top/bottom rule, closer to a persistent
+       terminal status line than a "notification card" UI-kit component. */
     .spoiler-shield {
-      background: #1a1608;
-      border: 1px solid #3d2e00;
-      border-left: 3px solid var(--gold-dim);
+      background: transparent;
+      border-top: 1px solid #3d2e00;
+      border-bottom: 1px solid #3d2e00;
+    }
+
+    /* Inline info callouts (zero-results notice, hidden-passage-count notice) -- round 3:
+       these previously reused .spoiler-shield's boxed treatment, which read as a floating
+       "AI dashboard alert card." Replaced with a plain top-rule + text, the way a footnote
+       or editorial aside is set, not a colored notification component. */
+    .info-notice {
+      border-top: 1px solid var(--dungeon-border);
+      padding-top: 0.75rem;
     }
 
     /* Book selector */
@@ -150,18 +163,21 @@
     SPOILER SHIELD ACTIVE — Showing content through
     <strong>Floor {{ max_floor }}</strong>
     <span class="text-gold-dim mx-2" aria-hidden="true">·</span>
-    <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-gold hover:text-yellow-300 underline underline-offset-2 transition">
+    <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-gold hover:text-[#e0c065] underline underline-offset-2 transition">
       Clear filter
     </a>
   </div>
   {% endif %}
 
   <!-- Nav -->
-  <nav class="border-b border-gray-800 bg-black bg-opacity-70 sticky top-0 z-50 backdrop-blur-sm">
+  <!-- 2026-07-28 round 3: dropped bg-opacity-70 + backdrop-blur-sm -- a translucent,
+       blurred nav bar is another named AI-slop tell ("the same backdrop-blur-md nav").
+       Solid near-black background instead. -->
+  <nav class="border-b border-gray-800 bg-[#0a0a12] sticky top-0 z-50">
     <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
 
       <!-- Logo -->
-      <a href="/" class="font-display text-lg font-bold text-gold tracking-widest hover:text-yellow-300 transition flex-shrink-0">
+      <a href="/" class="font-display text-lg font-semibold text-gold tracking-widest hover:text-[#e0c065] transition flex-shrink-0">
         ⚔ DCC Codex
       </a>
 
@@ -179,7 +195,7 @@
         <span class="text-gray-400 text-xs font-mono-sys hidden sm:inline">FLOOR:</span>
         <select
           id="floor-selector"
-          class="book-select bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-300 py-1 pl-2 focus:outline-none focus:border-yellow-800 cursor-pointer transition"
+          class="book-select bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-300 py-1 pl-2 focus:outline-none focus:border-[#4a3a10] cursor-pointer transition"
         >
           <option value="" class="bg-gray-900">All Floors</option>
           {% for floor in floors %}
@@ -197,7 +213,7 @@
           id="nav-search"
           type="text"
           placeholder="Search..."
-          class="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-yellow-800 w-40 transition hover:border-gray-700"
+          class="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#4a3a10] w-40 transition hover:border-gray-700"
         >
         <div id="nav-search-results"
              class="absolute right-0 top-10 bg-gray-950 border border-gray-800 rounded shadow-2xl w-80 hidden z-50 overflow-hidden">
