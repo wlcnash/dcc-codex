@@ -36,22 +36,25 @@
   <!-- Meta column -->
   <div class="lg:col-span-2">
 
-    <!-- Name + badges -->
+    <!-- Name + type line -->
     <div class="mb-5">
-      <div class="flex flex-wrap items-center gap-3 mb-2">
-        <span class="px-3 py-1 rounded badge-{{ entity.entity_type.value }} capitalize font-mono-sys text-xs tracking-wide">
-          {{ entity.entity_type.value }}
-        </span>
+      <!-- 2026-07-28 round 3: these were filled color-chip "badges" (round 2 only fixed
+           their color, not the fact that a rounded colored box around a label is itself a
+           named AI-slop tell). Dropped the boxes entirely -- type/species/major status is
+           now a plain metadata line distinguished by color + middot separators, the way a
+           print glossary or a terminal record header lists fields, not a UI-kit tag row. -->
+      <div class="flex flex-wrap items-center gap-2 mb-2 font-mono-sys text-xs tracking-widest uppercase">
+        <span class="badge-{{ entity.entity_type.value }}">{{ entity.entity_type.value }}</span>
         {% if entity.species %}
-        <span class="px-3 py-1 rounded bg-[#0f2340] text-[#6baed6] font-mono-sys text-xs tracking-wide">
-          {{ entity.species.name }}
-        </span>
+        <span class="text-gray-600" aria-hidden="true">·</span>
+        <span class="text-[#6baed6]">{{ entity.species.name }}</span>
         {% endif %}
         {% if entity.is_major %}
-        <span class="text-gold text-xs font-mono-sys tracking-widest">★ MAJOR</span>
+        <span class="text-gray-600" aria-hidden="true">·</span>
+        <span class="text-gold">★ MAJOR</span>
         {% endif %}
       </div>
-      <h1 class="font-display text-4xl md:text-5xl font-bold text-gold tracking-wide leading-tight">
+      <h1 class="font-display text-4xl md:text-5xl font-semibold text-gold tracking-wide leading-tight">
         {{ entity.name }}
       </h1>
       {% if aliases_shown %}
@@ -201,17 +204,17 @@
 
 <!-- Spoiler shield notice (if passages are hidden) -->
 {% if hidden_count > 0 %}
-<div class="spoiler-shield rounded-lg px-5 py-3 mb-10 flex items-center gap-3 text-sm">
-  <span class="text-gold text-lg" aria-hidden="true">🛡</span>
-  <div>
-    <span class="font-mono-sys text-gold text-xs tracking-widest block mb-0.5">SPOILER SHIELD ACTIVE</span>
-    <span class="text-gray-400 text-xs">
-      {{ hidden_count }} passage{{ 's' if hidden_count != 1 }} from later books are hidden.
-      <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-gold hover:text-yellow-300 underline underline-offset-2 transition ml-1">
-        Clear filter to see all.
-      </a>
-    </span>
-  </div>
+<!-- 2026-07-28 round 3: dropped the boxed-card treatment + shield emoji-in-a-badge (an
+     "icon inside a colored container" pattern is the same family of tell as a pill badge)
+     in favor of a plain top-rule callout, matching the zero-results notice on /browse. -->
+<div class="info-notice mb-10 text-sm">
+  <span class="font-mono-sys text-gold text-xs tracking-widest block mb-0.5">SPOILER SHIELD ACTIVE</span>
+  <span class="text-gray-400 text-xs">
+    {{ hidden_count }} passage{{ 's' if hidden_count != 1 }} from later books are hidden.
+    <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-gold hover:text-[#e0c065] underline underline-offset-2 transition ml-1">
+      Clear filter to see all.
+    </a>
+  </span>
 </div>
 {% endif %}
 
