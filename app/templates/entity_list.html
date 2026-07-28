@@ -21,21 +21,22 @@
 </div>
 
 <!-- Type tabs -->
-<!-- 2026-07-28 aesthetic pass: was raw Tailwind yellow-900/yellow-500, a slightly
-     different (more orange) hue than the site's own --gold custom property -- a subtle
-     but real "two golds fighting" inconsistency. Switched to the same --gold/--gold-dim
-     tokens used everywhere else so the active-tab treatment matches the rest of the
-     System AI palette instead of introducing a near-miss third yellow. -->
-<div class="flex flex-wrap gap-1.5 mb-5">
+<!-- 2026-07-28 round 3: round 2 fixed the color (raw yellow -> --gold) but kept the
+     filled-box "pill nav" shape, which is its own AI-slop tell independent of color.
+     Real editorial/product nav (GitHub, Linear-style) uses underline tabs sharing one
+     hairline rule, not a row of colored buttons -- switched to that: a shared bottom
+     hairline under the whole row, active tab gets a 2px gold underline + gold text,
+     inactive tabs are plain text with no box at all. -->
+<div class="flex flex-wrap gap-5 mb-5 border-b border-gray-800">
   <a href="/browse{% if q %}?q={{ q }}{% endif %}"
-     class="px-3 py-1 rounded text-xs font-mono-sys tracking-wide transition
-            {% if not entity_type %}bg-[#2e2408] text-gold border border-[#4a3a10]{% else %}bg-gray-900 text-gray-400 border border-gray-900 hover:text-gray-200 hover:border-gray-800{% endif %}">
+     class="pb-2 -mb-px text-xs font-mono-sys tracking-wide transition border-b-2
+            {% if not entity_type %}text-gold border-[#c89b3c]{% else %}text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-700{% endif %}">
     ALL
   </a>
   {% for type_key, label in entity_type_labels.items() %}
   <a href="/browse?entity_type={{ type_key }}{% if q %}&q={{ q }}{% endif %}"
-     class="px-3 py-1 rounded text-xs font-mono-sys tracking-wide transition
-            {% if entity_type == type_key %}bg-[#2e2408] text-gold border border-[#4a3a10]{% else %}bg-gray-900 text-gray-400 border border-gray-900 hover:text-gray-200 hover:border-gray-800{% endif %}">
+     class="pb-2 -mb-px text-xs font-mono-sys tracking-wide transition border-b-2
+            {% if entity_type == type_key %}text-gold border-[#c89b3c]{% else %}text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-700{% endif %}">
     {{ label.upper() }}
   </a>
   {% endfor %}
@@ -67,7 +68,7 @@
 
 <!-- Spoiler notice -->
 {% if max_floor and total == 0 %}
-<div class="spoiler-shield rounded-lg px-5 py-4 mb-8 text-sm">
+<div class="info-notice mb-8 text-sm">
   <span class="font-mono-sys text-gold text-xs tracking-widest block mb-1">SPOILER SHIELD ACTIVE</span>
   <span class="text-gray-400">No entities found for Floor {{ max_floor }} and earlier. The dungeon may hold more secrets in later floors.</span>
 </div>
@@ -90,11 +91,12 @@
     {% endif %}
     <div class="p-2.5">
       <div class="text-sm font-semibold text-gray-200 truncate leading-tight">{{ entity.name }}</div>
-      <div class="flex items-center gap-1 mt-1.5">
-        <span class="text-xs px-1.5 py-0.5 rounded badge-{{ entity.entity_type.value }} capitalize font-mono-sys" style="font-size:0.65rem">
+      <div class="flex items-center gap-1.5 mt-1.5">
+        <span class="badge-{{ entity.entity_type.value }} capitalize font-mono-sys tracking-wide" style="font-size:0.65rem">
           {{ entity.entity_type.value }}
         </span>
         {% if entity.is_major %}
+        <span class="text-gray-600" aria-hidden="true">·</span>
         <span class="text-gold text-xs">★</span>
         {% endif %}
       </div>
