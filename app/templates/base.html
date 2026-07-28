@@ -8,13 +8,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;1,8..60,300;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    /* 2026-07-28 contrast pass: per WCAG guidance (AA = 4.5:1 for normal text, 3:1 for
+       large text/UI), pure/near-black backgrounds paired with heavily dimmed text fail
+       readability and cause halation. Background lightened slightly from #080810 to
+       #12121c (still very dark, no longer near-pure-black). Any place in the templates
+       using text-gray-700/800/900 for content meant to actually be READ (not decorative
+       borders) has been bumped to text-gray-500/600, which clears AA at this background
+       value. Borders/dividers (border-gray-800/900) are left alone -- WCAG's 3:1
+       non-text-UI-component rule applies to focus/interactive boundaries, not subtle
+       decorative dividers, and darkening those was never the complaint. */
     :root {
       --gold: #c89b3c;
       --gold-dim: #8a6a28;
-      --dungeon-bg: #080810;
-      --dungeon-surface: #0f0f1e;
-      --dungeon-card: #111124;
-      --dungeon-border: #1e2040;
+      --dungeon-bg: #12121c;
+      --dungeon-surface: #17172a;
+      --dungeon-card: #191932;
+      --dungeon-border: #262850;
       --dungeon-border-hover: #c89b3c;
       --system-amber: #d97706;
       --system-amber-dim: #92400e;
@@ -54,13 +63,13 @@
 
     /* System AI terminal block */
     .system-terminal {
-      background: #09090f;
+      background: #131320;
       border: 1px solid #3d2e00;
       border-radius: 0.5rem;
       overflow: hidden;
     }
     .system-terminal-header {
-      background: #110e00;
+      background: #1a1608;
       border-bottom: 1px solid #3d2e00;
       padding: 0.5rem 1rem;
     }
@@ -89,7 +98,7 @@
 
     /* Spoiler shield banner */
     .spoiler-shield {
-      background: linear-gradient(90deg, #0e1a0e 0%, #111a11 100%);
+      background: linear-gradient(90deg, #142014 0%, #172017 100%);
       border: 1px solid #1a3a1a;
       border-left: 3px solid #2d6a2d;
     }
@@ -99,7 +108,7 @@
       -webkit-appearance: none;
       appearance: none;
       background-color: transparent;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 0.5rem center;
       padding-right: 1.5rem;
@@ -119,15 +128,15 @@
     <span class="text-green-600">■</span>
     SPOILER SHIELD ACTIVE — Showing content through
     <strong class="text-green-300">Floor {{ max_floor }}</strong>
-    <span class="text-green-700 mx-2">·</span>
-    <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-green-600 hover:text-green-400 underline underline-offset-2 transition">
+    <span class="text-green-600 mx-2">·</span>
+    <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-green-500 hover:text-green-300 underline underline-offset-2 transition">
       Clear filter
     </a>
   </div>
   {% endif %}
 
   <!-- Nav -->
-  <nav class="border-b border-gray-900 bg-black bg-opacity-70 sticky top-0 z-50 backdrop-blur-sm">
+  <nav class="border-b border-gray-800 bg-black bg-opacity-70 sticky top-0 z-50 backdrop-blur-sm">
     <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
 
       <!-- Logo -->
@@ -137,19 +146,19 @@
 
       <!-- Nav links -->
       <div class="flex items-center gap-5 text-sm flex-1">
-        <a href="/browse" class="text-gray-500 hover:text-gold transition">Browse</a>
-        <a href="/browse?entity_type=crawler" class="text-gray-500 hover:text-gold transition hidden sm:inline">Crawlers</a>
-        <a href="/browse?entity_type=npc" class="text-gray-500 hover:text-gold transition hidden sm:inline">NPCs</a>
-        <a href="/browse?entity_type=mob" class="text-gray-500 hover:text-gold transition hidden md:inline">Mobs</a>
-        <a href="/browse?entity_type=location" class="text-gray-500 hover:text-gold transition hidden lg:inline">Locations</a>
+        <a href="/browse" class="text-gray-400 hover:text-gold transition">Browse</a>
+        <a href="/browse?entity_type=crawler" class="text-gray-400 hover:text-gold transition hidden sm:inline">Crawlers</a>
+        <a href="/browse?entity_type=npc" class="text-gray-400 hover:text-gold transition hidden sm:inline">NPCs</a>
+        <a href="/browse?entity_type=mob" class="text-gray-400 hover:text-gold transition hidden md:inline">Mobs</a>
+        <a href="/browse?entity_type=location" class="text-gray-400 hover:text-gold transition hidden lg:inline">Locations</a>
       </div>
 
       <!-- Floor selector -->
       <div class="flex items-center gap-2 flex-shrink-0">
-        <span class="text-gray-700 text-xs font-mono-sys hidden sm:inline">FLOOR:</span>
+        <span class="text-gray-500 text-xs font-mono-sys hidden sm:inline">FLOOR:</span>
         <select
           id="floor-selector"
-          class="book-select bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-400 py-1 pl-2 focus:outline-none focus:border-yellow-800 cursor-pointer transition"
+          class="book-select bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-300 py-1 pl-2 focus:outline-none focus:border-yellow-800 cursor-pointer transition"
         >
           <option value="" class="bg-gray-900">All Floors</option>
           {% for floor in floors %}
@@ -167,7 +176,7 @@
           id="nav-search"
           type="text"
           placeholder="Search..."
-          class="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm text-gray-200 placeholder-gray-700 focus:outline-none focus:border-yellow-800 w-40 transition hover:border-gray-700"
+          class="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-yellow-800 w-40 transition hover:border-gray-700"
         >
         <div id="nav-search-results"
              class="absolute right-0 top-10 bg-gray-950 border border-gray-800 rounded shadow-2xl w-80 hidden z-50 overflow-hidden">
@@ -183,9 +192,9 @@
   </main>
 
   <!-- Footer -->
-  <footer class="border-t border-gray-900 mt-20 py-10 text-center text-gray-700 text-xs font-mono-sys">
-    <p class="tracking-wide">DCC CODEX — FAN COMPENDIUM FOR <em class="not-italic text-gray-600">DUNGEON CRAWLER CARL</em> BY MATT DINNIMAN</p>
-    <p class="mt-2 text-gray-800">All text excerpts © Matt Dinniman · Images generated via Imagen 3 from source text · Not affiliated with the author</p>
+  <footer class="border-t border-gray-800 mt-20 py-10 text-center text-gray-500 text-xs font-mono-sys">
+    <p class="tracking-wide">DCC CODEX — FAN COMPENDIUM FOR <em class="not-italic text-gray-400">DUNGEON CRAWLER CARL</em> BY MATT DINNIMAN</p>
+    <p class="mt-2 text-gray-600">All text excerpts © Matt Dinniman · Images generated via Imagen 3 from source text · Not affiliated with the author</p>
   </footer>
 
   <script>
@@ -216,11 +225,11 @@
              class="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-900 transition border-b border-gray-900 last:border-0">
             ${e.image_url
               ? `<img src="${e.image_url}" class="w-9 h-9 rounded object-cover flex-shrink-0 opacity-90">`
-              : `<div class="w-9 h-9 rounded bg-gray-800 flex-shrink-0 flex items-center justify-center text-gray-600 text-sm">${entityIcon(e.type)}</div>`
+              : `<div class="w-9 h-9 rounded bg-gray-800 flex-shrink-0 flex items-center justify-center text-gray-500 text-sm">${entityIcon(e.type)}</div>`
             }
             <div class="min-w-0">
               <div class="text-sm text-gray-200 truncate">${e.name}</div>
-              <div class="text-xs text-gray-600 capitalize mt-0.5">${e.type}</div>
+              <div class="text-xs text-gray-500 capitalize mt-0.5">${e.type}</div>
             </div>
           </a>
         `).join('');
