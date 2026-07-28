@@ -10,19 +10,61 @@ RATE_LIMIT_SECONDS = 3.0
 TRANSIENT_RECENT_LIMIT = 3
 MAX_IMAGE_ATTEMPTS = 3
 
+# 2026-07-28: hand-curated core-identity anchors for a small number of major recurring
+# characters, keyed by entity_id. Purpose: Wes flagged that Carl "looks like a different
+# dude from floor to floor" -- confirmed by inspecting the actual stored prompts across
+# his 10 generated floor appearances: hair alone was described as unspecified, "completely
+# bald... no eyebrows" (a one-off transient injury baked in as if permanent), and "long,
+# wavy, shining hair that cascades all the way down to his waist" (an invented exaggeration)
+# on different floors, with nothing forcing continuity between them. Root cause: each
+# floor's image prompt is built independently from that floor's own durable+transient
+# passage sample with no persistent baseline, so ambiguous or sparsely-described traits
+# get reinterpreted differently every single time.
+#
+# Fix: an optional, constant CORE IDENTITY block included in every prompt for entities
+# listed here, describing foundational traits (species/build/face/base hair color) that
+# must not vary floor-to-floor. Sourced from public fan-wiki consensus
+# (dungeon-crawler-carl.fandom.com), NOT purely from in-corpus passages -- an explicit,
+# narrow exception to the "never invent unsourced detail" rule that Wes authorized
+# specifically for this stabilizing purpose, since the alternative (silence on an
+# attribute) is what caused the drift in the first place. This is a floor, not a ceiling:
+# any floor's own durable passages can still override a detail here (e.g. Carl's canon
+# hair-length change once he acquires the Enchanted Hairbrush of the Beefmaster) --
+# the prompt below explicitly tells the model that a later durable passage wins.
+CANONICAL_IDENTITY = {
+    1: (  # Carl
+        "CORE IDENTITY (always true, must appear consistently in every image regardless of floor): "
+        "a human man, twenty-seven years old, 6'3\" tall, 230 lbs, with a naturally muscular, "
+        "broad-shouldered build and fair skin. Short, practical brown hair, kept neatly trimmed, "
+        "and a clean-shaven face -- he shaves every single day even in the dungeon. Facial features "
+        "inherited from his father, most notably his nose. This is his baseline appearance and must "
+        "be reflected on every floor UNLESS a passage below explicitly and durably describes a "
+        "permanent change to one of these specific traits (for example: growing his hair out long and "
+        "keeping it that way from then on) -- in that case, follow the passage instead of this block, "
+        "but only for the specific trait the passage actually changes, not the rest of this description."
+    ),
+}
+
 PROMPT_BUILDER_SYSTEM = (
     "You are creating image generation prompts for a Dungeon Crawler Carl compendium. "
-    "Base prompts ONLY on the author exact descriptions from the specified floor. "
-    "Do not add details not present in the source text. Keep the dungeon aesthetic: gritty, alien, dangerous. "
+    "Base prompts ONLY on the author exact descriptions from the specified floor, plus the CORE "
+    "IDENTITY block when one is given. Do not add details not present in the source text or the "
+    "CORE IDENTITY block. Keep the dungeon aesthetic: gritty, alien, dangerous. "
     "Return ONLY the image prompt text, nothing else."
 )
 
 PROMPT_BUILDER_USER = (
+    '{identity_block}'
     'Based on these exact passages from the story up through Floor {floor_number}, '
     "create an image generation prompt for: {entity_name} ({entity_type})\n\n"
     "PASSAGES, in story order (earlier passages first, most recent last). If two passages describe the "
     "same thing differently (e.g. footwear, an item he's carrying, an injury), the LATER passage in this "
-    "list is what's currently true -- use that one and ignore the earlier, superseded detail:\n{passages}\n\n"
+    "list is what's currently true -- use that one and ignore the earlier, superseded detail. If a passage "
+    "here conflicts with the CORE IDENTITY block above on a specific named trait, the passage wins for that "
+    "trait only (it means the character has permanently changed). Passages describing a one-off, in-the-"
+    "moment combat state (mid-fight injuries, blood/gore from a specific ongoing scene) should be reflected "
+    "as recent battle damage layered on top of the core identity, not as a replacement of it -- do not let a "
+    "single transient action passage overwrite foundational traits like hair color, face, or build:\n{passages}\n\n"
     "Create a single detailed image prompt capturing the appearance described above, resolved to his current, "
     "present-day state. "
     "Include: visual style (dark fantasy illustration), dungeon torchlight lighting, "
@@ -33,12 +75,11 @@ PROMPT_BUILDER_USER = (
     "If this is a LOCATION or environment (not a character), the final sentence of the prompt must explicitly "
     "state whether any person is present, based only on the passages above -- if no person is described in the "
     "passages, state explicitly that the scene shows no people, empty of any figures. "
-    "GROUNDING RULE, NO EXCEPTIONS: for any physical attribute NOT covered by the passages above (for example: "
-    "hair color/length/style, eye color, facial hair, skin tone detail, specific facial features), do NOT invent "
+    "GROUNDING RULE, NO EXCEPTIONS: for any physical attribute NOT covered by the passages above OR the CORE "
+    "IDENTITY block (for example: eye color, specific facial features not already named), do NOT invent "
     "or state a specific value for it. Leave it out of the prompt entirely rather than guessing. It is far better "
     "for the illustration to render an unremarkable, generic default for an unmentioned attribute than for this "
-    "prompt to assert a specific detail the source text never established. Only when a future floor's passages "
-    "describe that attribute should it ever appear in a prompt."
+    "prompt to assert a specific detail neither source ever established."
 )
 
 VERIFY_SYSTEM = (
@@ -65,11 +106,14 @@ VERIFY_SYSTEM = (
 )
 
 
-def build_image_prompt(entity_name, entity_type, durable_passages, transient_passages, floor_number, client):
+def build_image_prompt(entity_name, entity_type, durable_passages, transient_passages, floor_number, client, entity_id=None):
     sep = "\n\n---\n\n"
     all_passages = durable_passages + transient_passages
     passages_text = sep.join('"' + p + '"' for p in all_passages) if all_passages else "(no passages available)"
+    identity_anchor = CANONICAL_IDENTITY.get(entity_id)
+    identity_block = (identity_anchor + "\n\n") if identity_anchor else ""
     prompt = PROMPT_BUILDER_SYSTEM + "\n\n" + PROMPT_BUILDER_USER.format(
+        identity_block=identity_block,
         entity_name=entity_name, entity_type=entity_type, passages=passages_text,
         floor_number=floor_number,
     )
@@ -269,7 +313,7 @@ def _fetch_passages(conn, entity_id, floor_id, floor_number):
     return durable, transient
 
 
-def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_secret_key, batch_size=20):
+def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_secret_key, batch_size=20, entity_floor_pairs=None):
     """
     Generate per-floor images for entities.
     One image per (entity, floor) pair where physical passages exist.
@@ -280,6 +324,10 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
     generic background figures in location/environment images) get up to MAX_IMAGE_ATTEMPTS retries with an
     explicit correction clause. The full verification history is stored per appearance so failures are
     auditable even when a retry doesn't fully resolve them.
+
+    entity_floor_pairs: optional list of (entity_id, floor_number) tuples for a TARGETED regen (bypasses
+    the "only pairs with no existing row" gate) -- used to re-run specific already-generated appearances
+    after a prompt/logic fix, without touching everything else. If given, batch_size is ignored.
     """
     run_migrate(conn)
     run_id = log_run_start(conn, "images", {"batch_size": batch_size})
@@ -292,22 +340,31 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
     ensure_bucket(minio_client)
 
     cur = conn.cursor()
-    cur.execute("""
-        SELECT DISTINCT ON (e.id, f.id)
-               e.id, e.name, e.slug, e.entity_type::text, e.is_major,
-               f.id AS floor_id, f.floor_number, f.book_id
-        FROM entities e
-        JOIN passages p  ON p.entity_id  = e.id
-        JOIN chapter_floors cf ON cf.chapter_id = p.chapter_id
-        JOIN floors f    ON f.id         = cf.floor_id
-        WHERE p.passage_type = 'physical'
-          AND NOT EXISTS (
-              SELECT 1 FROM entity_appearances ea
-              WHERE ea.entity_id = e.id AND ea.floor_id = f.id
-          )
-        ORDER BY e.id, f.id, e.is_major DESC
-        LIMIT %s
-    """, (batch_size,))
+    if entity_floor_pairs:
+        cur.execute("""
+            SELECT e.id, e.name, e.slug, e.entity_type::text, e.is_major,
+                   f.id AS floor_id, f.floor_number, f.book_id
+            FROM entities e
+            JOIN floors f ON (e.id, f.floor_number) IN %s
+            ORDER BY e.id, f.id
+        """, (tuple(entity_floor_pairs),))
+    else:
+        cur.execute("""
+            SELECT DISTINCT ON (e.id, f.id)
+                   e.id, e.name, e.slug, e.entity_type::text, e.is_major,
+                   f.id AS floor_id, f.floor_number, f.book_id
+            FROM entities e
+            JOIN passages p  ON p.entity_id  = e.id
+            JOIN chapter_floors cf ON cf.chapter_id = p.chapter_id
+            JOIN floors f    ON f.id         = cf.floor_id
+            WHERE p.passage_type = 'physical'
+              AND NOT EXISTS (
+                  SELECT 1 FROM entity_appearances ea
+                  WHERE ea.entity_id = e.id AND ea.floor_id = f.id
+              )
+            ORDER BY e.id, f.id, e.is_major DESC
+            LIMIT %s
+        """, (batch_size,))
     targets = cur.fetchall()
     cur.close()
 
@@ -324,13 +381,13 @@ def run_imager(conn, gemini_api_key, minio_endpoint, minio_access_key, minio_sec
     for entity_id, name, slug, entity_type, is_major, floor_id, floor_number, book_id in targets:
         durable, transient = _fetch_passages(conn, entity_id, floor_id, floor_number)
 
-        if not durable and not transient:
+        if not durable and not transient and entity_id not in CANONICAL_IDENTITY:
             continue
 
         logger.info("  [Floor %d] %s (%d durable, %d current-state passages)", floor_number, name, len(durable), len(transient))
 
         try:
-            image_prompt = build_image_prompt(name, entity_type, durable, transient, floor_number, client)
+            image_prompt = build_image_prompt(name, entity_type, durable, transient, floor_number, client, entity_id=entity_id)
         except Exception as e:
             logger.warning("  Prompt failed for %s floor %d: %s", name, floor_number, e)
             failed += 1
