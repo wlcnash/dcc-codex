@@ -4,13 +4,13 @@
 {% block content %}
 
 <!-- Breadcrumb -->
-<nav class="text-xs font-mono-sys text-gray-700 mb-8 flex items-center gap-2 tracking-wide">
+<nav class="text-xs font-mono-sys text-gray-500 mb-8 flex items-center gap-2 tracking-wide">
   <a href="/" class="hover:text-gold transition">HOME</a>
-  <span class="text-gray-800">›</span>
+  <span class="text-gray-600">›</span>
   <a href="/browse?entity_type={{ entity.entity_type.value }}" class="hover:text-gold transition uppercase">
     {{ entity_type_labels.get(entity.entity_type.value, entity.entity_type.value) }}
   </a>
-  <span class="text-gray-800">›</span>
+  <span class="text-gray-600">›</span>
   <span class="text-gray-500">{{ entity.name }}</span>
 </nav>
 
@@ -28,7 +28,7 @@
     {% else %}
     <div class="w-full aspect-square rounded-xl border border-gray-900 bg-gray-950 flex flex-col items-center justify-center">
       <span class="text-5xl mb-3 opacity-20">{{ entity_type_icons[entity.entity_type.value] }}</span>
-      <span class="font-mono-sys text-gray-800 text-xs tracking-widest">NO IMAGE GENERATED</span>
+      <span class="font-mono-sys text-gray-600 text-xs tracking-widest">NO IMAGE GENERATED</span>
     </div>
     {% endif %}
   </div>
@@ -62,12 +62,12 @@
       </div>
       {% if aliases_rest %}
       <details class="mt-2">
-        <summary class="text-xs text-gray-700 hover:text-gray-500 cursor-pointer font-mono-sys list-none underline underline-offset-2 decoration-dotted">
+        <summary class="text-xs text-gray-500 hover:text-gray-500 cursor-pointer font-mono-sys list-none underline underline-offset-2 decoration-dotted">
           +{{ aliases_rest|length }} more
         </summary>
         <div class="flex flex-wrap gap-2 mt-2">
           {% for alias in aliases_rest %}
-          <span class="text-xs text-gray-700 bg-gray-950 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
+          <span class="text-xs text-gray-500 bg-gray-950 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
           {% endfor %}
         </div>
       </details>
@@ -103,11 +103,11 @@
     <div class="dungeon-card rounded-lg p-4 text-sm mb-5 space-y-2.5">
       {% if first_book %}
       <div class="flex gap-3 items-baseline">
-        <span class="font-mono-sys text-gray-700 text-xs tracking-wide w-32 flex-shrink-0 uppercase">First Appears</span>
+        <span class="font-mono-sys text-gray-500 text-xs tracking-wide w-32 flex-shrink-0 uppercase">First Appears</span>
         <span class="text-gray-400">
           <em class="not-italic">{{ first_book.title }}</em>
           {% if first_chapter %}
-          <span class="text-gray-700 mx-1">·</span>
+          <span class="text-gray-500 mx-1">·</span>
           {% if first_chapter.chapter_title %}
           <span class="text-gray-500">{{ first_chapter.chapter_title }}</span>
           {% else %}
@@ -118,7 +118,7 @@
       </div>
       {% endif %}
       <div class="flex gap-3 items-baseline">
-        <span class="font-mono-sys text-gray-700 text-xs tracking-wide w-32 flex-shrink-0 uppercase">Total Passages</span>
+        <span class="font-mono-sys text-gray-500 text-xs tracking-wide w-32 flex-shrink-0 uppercase">Total Passages</span>
         <span class="text-gray-400 tabular-nums">
           {{ visible_count }}
           {% if hidden_count > 0 %}
@@ -133,7 +133,7 @@
     <!-- Stats / Skills infobox (only verified rows -- see entity_stats/entity_skills verify_pass1/verify_pass2) -->
     {% if stat_rows or skill_rows %}
     <div class="dungeon-card rounded-lg p-4 text-sm mb-5">
-      <div class="font-mono-sys text-xs text-gray-700 tracking-widest mb-3 uppercase">Stats &amp; Skills</div>
+      <div class="font-mono-sys text-xs text-gray-500 tracking-widest mb-3 uppercase">Stats &amp; Skills</div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {% if stat_rows %}
         <div>
@@ -144,10 +144,10 @@
                 <td class="py-1.5 pr-2 text-gray-500 font-mono-sys">{{ stat_name }}</td>
                 <td class="py-1.5 text-gray-300 tabular-nums" title="{{ reason }}">
                   {% if value is none %}
-                  <span class="text-gray-700">?</span>
+                  <span class="text-gray-500">?</span>
                   {% else %}
                   {{ '+' if value_type == 'delta' and value > 0 }}{{ value }}
-                  <span class="text-gray-700">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
+                  <span class="text-gray-500">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
                   {% endif %}
                 </td>
               </tr>
@@ -165,7 +165,7 @@
                 <td class="py-1.5 pr-2 text-gray-500 font-mono-sys">{{ skill_name }}</td>
                 <td class="py-1.5 text-gray-300 tabular-nums" title="{{ reason }}">
                   {% if level is none %}
-                  <span class="text-gray-700">?</span>
+                  <span class="text-gray-500">?</span>
                   {% else %}
                   Lv. {{ level }}{{ ' (bonus)' if value_type == 'delta' else '' }}
                   {% endif %}
@@ -183,12 +183,12 @@
     <!-- Relationships -->
     {% if relationships %}
     <div>
-      <div class="font-mono-sys text-xs text-gray-700 tracking-widest mb-2 uppercase">Known Connections</div>
+      <div class="font-mono-sys text-xs text-gray-500 tracking-widest mb-2 uppercase">Known Connections</div>
       <div class="flex flex-wrap gap-2">
         {% for rel, related_entity in relationships %}
         <a href="/entity/{{ related_entity.slug }}"
            class="flex items-center gap-1.5 dungeon-card rounded-full px-3 py-1 text-xs transition hover:text-gold">
-          <span class="text-gray-700 capitalize">{{ rel.relation_type }}</span>
+          <span class="text-gray-500 capitalize">{{ rel.relation_type }}</span>
           <span class="text-gray-500">·</span>
           <span class="text-gray-300">{{ related_entity.name }}</span>
         </a>
@@ -224,7 +224,7 @@
 <details class="mb-8">
   <summary class="font-display text-lg text-gold tracking-wide cursor-pointer select-none flex items-center gap-3 py-2 border-t border-gray-900 pt-6">
     <span>▸ Source Passages</span>
-    <span class="font-mono-sys text-xs text-gray-700 tabular-nums">{{ total_passage_count }}</span>
+    <span class="font-mono-sys text-xs text-gray-500 tabular-nums">{{ total_passage_count }}</span>
     <span class="flex-1 h-px bg-gray-900"></span>
   </summary>
 
@@ -242,7 +242,7 @@
           {% elif ptype == 'action' %}Notable Actions
           {% else %}Other Mentions{% endif %}
         </h2>
-        <span class="font-mono-sys text-xs text-gray-800 tabular-nums">
+        <span class="font-mono-sys text-xs text-gray-600 tabular-nums">
           {{ type_passages|length }} passage{{ 's' if type_passages|length != 1 }}
         </span>
         <div class="flex-1 h-px bg-gray-900"></div>
@@ -256,11 +256,11 @@
         <div class="dungeon-card rounded-lg p-5">
 
           <!-- Source citation -->
-          <div class="font-mono-sys text-xs text-gray-700 mb-3 flex flex-wrap items-center gap-1.5 tracking-wide">
-            <span class="text-gray-800">BOOK {{ book.book_number }}</span>
-            <span class="text-gray-800">·</span>
-            <em class="not-italic text-gray-700">{{ book.title }}</em>
-            <span class="text-gray-800">·</span>
+          <div class="font-mono-sys text-xs text-gray-500 mb-3 flex flex-wrap items-center gap-1.5 tracking-wide">
+            <span class="text-gray-600">BOOK {{ book.book_number }}</span>
+            <span class="text-gray-600">·</span>
+            <em class="not-italic text-gray-500">{{ book.title }}</em>
+            <span class="text-gray-600">·</span>
             {% if chapter.chapter_title %}
             {% if chapter.url %}
             <a href="{{ chapter.url }}" target="_blank" rel="noopener noreferrer"
@@ -275,7 +275,7 @@
 
           <!-- Context before -->
           {% if passage.context_before %}
-          <p class="text-gray-700 text-sm italic leading-relaxed mb-2 pl-4 border-l border-gray-900">
+          <p class="text-gray-500 text-sm italic leading-relaxed mb-2 pl-4 border-l border-gray-900">
             …{{ passage.context_before }}
           </p>
           {% endif %}
@@ -287,7 +287,7 @@
 
           <!-- Context after -->
           {% if passage.context_after %}
-          <p class="text-gray-700 text-sm italic leading-relaxed mt-2 pl-4 border-l border-gray-900">
+          <p class="text-gray-500 text-sm italic leading-relaxed mt-2 pl-4 border-l border-gray-900">
             {{ passage.context_after }}…
           </p>
           {% endif %}
@@ -302,10 +302,10 @@
 </details>
 
 {% else %}
-<div class="text-center py-20 text-gray-800">
+<div class="text-center py-20 text-gray-600">
   <div class="font-mono-sys text-xs tracking-widest mb-2">NO PASSAGES AVAILABLE</div>
   {% if max_floor %}
-  <p class="text-xs text-gray-800">Spoiler shield may be filtering all passages. <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-green-900 hover:text-green-700 underline underline-offset-2">Clear filter.</a></p>
+  <p class="text-xs text-gray-600">Spoiler shield may be filtering all passages. <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-green-900 hover:text-green-700 underline underline-offset-2">Clear filter.</a></p>
   {% endif %}
 </div>
 {% endif %}
