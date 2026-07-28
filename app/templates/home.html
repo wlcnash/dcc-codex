@@ -3,46 +3,51 @@
 
 {% block content %}
 
-<!-- Hero -->
-<div class="py-14 mb-16 text-center relative">
-  <!-- Decorative lines -->
-  <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#4a3a10] to-transparent opacity-60"></div>
-  <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#4a3a10] to-transparent opacity-60"></div>
-
-  <div class="font-mono-sys text-xs text-gold-dim tracking-widest mb-4 uppercase">Contestant Knowledge Base — Dungeon System v8.3.1</div>
-  <h1 class="font-display text-5xl md:text-6xl font-semibold text-gold mb-4 tracking-wider">DCC Codex</h1>
-  <p class="text-gray-400 text-lg max-w-xl mx-auto leading-relaxed">
-    Source-anchored visual compendium for <em class="text-gray-300 not-italic">Dungeon Crawler Carl</em>.
-    Every entry traces back to the author's exact words.
-  </p>
-
-  {% if max_floor %}
-  <!-- 2026-07-28 round 3: this was a floating rounded pill with a colored dot below a
-       centered hero -- textbook "AI SaaS landing page" composition (centered headline,
-       badge floating underneath). The floor filter is already shown in the nav selector,
-       so this is secondary info; demoted to a plain caption line, no box, no dot. -->
-  <p class="mt-4 text-xs font-mono-sys text-gray-400 tracking-wide">
-    Spoiler shield through Floor {{ max_floor }}
-  </p>
-  {% endif %}
+<!-- Header -->
+<!-- 2026-07-28 round 4: round 3 fixed individual components (badges, pills, nav blur) but
+     left the overall PAGE COMPOSITION untouched -- a fully centered, vertically-stacked
+     title/subtitle/stat-row is itself the tell, independent of any component inside it.
+     Research is explicit on this: "AI-generated layouts are almost always vertically
+     stacked, full-width sections with centered content... AI templates default to centered
+     headlines, centered paragraphs, and centered buttons, which reads as 'I didn't decide.'"
+     Rebuilt as an asymmetric two-column header instead: title/subtitle left-aligned in a
+     wider column, stats in a narrower right column separated by a hairline (not centered
+     underneath) -- this also fits the site's own "database record" identity better than a
+     marketing hero ever did (a terminal doesn't center its own splash screen). Also dropped
+     the top/bottom decorative gradient hairlines that used to frame the centered block --
+     they only made sense as hero-section bookends. -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 py-10 mb-16 items-start">
+  <div class="lg:col-span-2">
+    <div class="font-mono-sys text-xs text-gold-dim tracking-widest mb-3 uppercase">Contestant Knowledge Base — Dungeon System v8.3.1</div>
+    <h1 class="font-display text-4xl md:text-5xl font-semibold text-gold mb-3 tracking-wide">DCC Codex</h1>
+    <p class="text-gray-400 text-base max-w-lg leading-relaxed">
+      Source-anchored visual compendium for <em class="text-gray-300 not-italic">Dungeon Crawler Carl</em>.
+      Every entry traces back to the author's exact words.
+    </p>
+    {% if max_floor %}
+    <p class="mt-3 text-xs font-mono-sys text-gray-400 tracking-wide">
+      Spoiler shield through Floor {{ max_floor }}
+    </p>
+    {% endif %}
+  </div>
 
   <!-- Stats -->
-  <div class="flex flex-wrap justify-center gap-x-12 gap-y-4 mt-10">
-    <div class="text-center">
-      <div class="font-display text-3xl font-bold text-gold">{{ total_entities }}</div>
-      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-1 uppercase">Entities</div>
+  <div class="lg:col-span-1 lg:border-l lg:border-gray-800 lg:pl-10 grid grid-cols-2 gap-x-6 gap-y-5">
+    <div>
+      <div class="font-display text-2xl font-semibold text-gold">{{ total_entities }}</div>
+      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-0.5 uppercase">Entities</div>
     </div>
-    <div class="text-center">
-      <div class="font-display text-3xl font-bold text-gold">{{ total_passages }}</div>
-      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-1 uppercase">Source Passages</div>
+    <div>
+      <div class="font-display text-2xl font-semibold text-gold">{{ total_passages }}</div>
+      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-0.5 uppercase">Passages</div>
     </div>
-    <div class="text-center">
-      <div class="font-display text-3xl font-bold text-gold">{{ total_chapters }}</div>
-      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-1 uppercase">Chapters</div>
+    <div>
+      <div class="font-display text-2xl font-semibold text-gold">{{ total_chapters }}</div>
+      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-0.5 uppercase">Chapters</div>
     </div>
-    <div class="text-center">
-      <div class="font-display text-3xl font-bold text-gold">{{ imaged_entities }}</div>
-      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-1 uppercase">Visualized</div>
+    <div>
+      <div class="font-display text-2xl font-semibold text-gold">{{ imaged_entities }}</div>
+      <div class="text-gray-400 text-xs font-mono-sys tracking-widest mt-0.5 uppercase">Visualized</div>
     </div>
   </div>
 </div>
