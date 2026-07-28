@@ -7,6 +7,7 @@ corporate-clinical, with dry dark humor. Runs the DB migration first (idempotent
 """
 
 import logging
+import re
 import time
 from typing import Optional
 
@@ -46,6 +47,41 @@ Source Passages (draw only from these):
 System AI profile:"""
 
 
+# Patterns that indicate the model leaked drafting scratchpad / meta-commentary
+# instead of a clean finished profile (e.g. "*   *Drafting Attempt 1:*",
+# "Length: 3-5 sentences.", "Let's stay strictly factual..."). Found via a live
+# audit (2026-07-28) showing 137/2029 entities with persona_text corrupted this
+# way, because the original code only checked for an empty string. This never
+# trusts unvalidated LLM output — same discipline already used in floors.py,
+# permanence.py, reclassify_types.py, and entity_resolution.py.
+_INVALID_PERSONA_PATTERNS = [
+    r"\*\*",                                   # markdown bold
+    r"(?im)^\s*[-*]\s*\*",                      # bullet-prefixed meta lines ("*   *Drafting...")
+    r"(?i)\bdrafting\b",
+    r"(?i)\battempt\s*\d",
+    r"(?im)^\s*length\s*:",
+    r"(?im)^\s*voice\s*:",
+    r"(?im)^\s*fact[- ]check",
+    r"(?im)^\s*sentence\s*\d",
+    r"(?i)\blet'?s\s+(stay|make sure|double[- ]check|verify|keep)\b",
+    r"(?i)\bstrictly factual\b",
+    r"(?i)\bno heading,?\s*no quotes\b",
+    r"(?im)^\s{0,3}#{1,6}\s",                   # markdown headings
+]
+
+
+def _is_valid_persona(text: str) -> bool:
+    """Reject LLM drafting-scratchpad / meta-commentary leakage before it ever
+    reaches the database. A malformed response must never be stored — leave
+    persona_text NULL instead so the next run retries it cleanly."""
+    if not text:
+        return False
+    for pattern in _INVALID_PERSONA_PATTERNS:
+        if re.search(pattern, text):
+            return False
+    return True
+
+
 def run_migrate(conn) -> None:
     """Ensure persona_text column exists. Safe to run multiple times."""
     cur = conn.cursor()
@@ -75,6 +111,7 @@ def run_persona(conn, gemini_api_key: str, batch_size: int = 999999) -> int:
 
     logger.info(f"Generating personas for {len(entities)} entities...")
     count = 0
+    rejected = 0
 
     for entity_id, entity_name, entity_type in entities:
         # Fetch passages — prioritize physical + personality; cap at ~3000 chars
@@ -140,6 +177,14 @@ def run_persona(conn, gemini_api_key: str, batch_size: int = 999999) -> int:
                 logger.warning(f"  Empty persona for '{entity_name}', skipping")
                 continue
 
+            if not _is_valid_persona(persona_text):
+                rejected += 1
+                logger.warning(
+                    f"  Rejected malformed/scratchpad persona for '{entity_name}' "
+                    f"(id={entity_id}), leaving NULL for retry: {persona_text[:80]!r}"
+                )
+                continue
+
             cur = conn.cursor()
             cur.execute(
                 "UPDATE entities SET persona_text = %s WHERE id = %s",
@@ -157,5 +202,5 @@ def run_persona(conn, gemini_api_key: str, batch_size: int = 999999) -> int:
             time.sleep(RATE_LIMIT_SECONDS)
             continue
 
-    logger.info(f"Persona generation complete: {count} entities processed.")
+    logger.info(f"Persona generation complete: {count} entities processed, {rejected} rejected as malformed.")
     return count
