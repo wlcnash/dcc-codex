@@ -10,17 +10,20 @@
   <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#4a3a10] to-transparent opacity-60"></div>
 
   <div class="font-mono-sys text-xs text-gold-dim tracking-widest mb-4 uppercase">Contestant Knowledge Base — Dungeon System v8.3.1</div>
-  <h1 class="font-display text-5xl md:text-6xl font-bold text-gold mb-4 tracking-wider">DCC Codex</h1>
+  <h1 class="font-display text-5xl md:text-6xl font-semibold text-gold mb-4 tracking-wider">DCC Codex</h1>
   <p class="text-gray-400 text-lg max-w-xl mx-auto leading-relaxed">
     Source-anchored visual compendium for <em class="text-gray-300 not-italic">Dungeon Crawler Carl</em>.
     Every entry traces back to the author's exact words.
   </p>
 
   {% if max_floor %}
-  <div class="mt-6 inline-flex items-center gap-2 text-xs font-mono-sys text-gold bg-[#1a1608] border border-[#3d2e00] rounded px-4 py-1.5">
-    <span class="w-1.5 h-1.5 rounded-full bg-[#8a6a28]"></span>
+  <!-- 2026-07-28 round 3: this was a floating rounded pill with a colored dot below a
+       centered hero -- textbook "AI SaaS landing page" composition (centered headline,
+       badge floating underneath). The floor filter is already shown in the nav selector,
+       so this is secondary info; demoted to a plain caption line, no box, no dot. -->
+  <p class="mt-4 text-xs font-mono-sys text-gray-400 tracking-wide">
     Spoiler shield through Floor {{ max_floor }}
-  </div>
+  </p>
   {% endif %}
 
   <!-- Stats -->
@@ -114,11 +117,14 @@
         {% endif %}
         <div class="p-2.5">
           <div class="text-sm font-semibold text-gray-200 truncate leading-tight">{{ entity.name }}</div>
-          <div class="flex items-center gap-1 mt-1">
-            <span class="text-xs px-1.5 py-0.5 rounded badge-{{ entity.entity_type.value }} capitalize">
+          <div class="flex items-center gap-1.5 mt-1">
+            <span class="text-xs badge-{{ entity.entity_type.value }} capitalize font-mono-sys tracking-wide">
               {{ entity.entity_type.value }}
             </span>
-            {% if entity.is_major %}<span class="text-gold text-xs">★</span>{% endif %}
+            {% if entity.is_major %}
+            <span class="text-gray-600" aria-hidden="true">·</span>
+            <span class="text-gold text-xs">★</span>
+            {% endif %}
           </div>
         </div>
       </a>
