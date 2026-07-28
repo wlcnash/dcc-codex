@@ -59,20 +59,18 @@
         {% for alias in aliases_shown %}
         <span class="text-xs text-gray-600 bg-gray-900 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
         {% endfor %}
-        {% if aliases_rest %}
-        <details class="inline">
-          <summary class="text-xs text-gray-700 hover:text-gray-500 cursor-pointer font-mono-sys list-none underline underline-offset-2 decoration-dotted">
-            +{{ aliases_rest|length }} more
-          </summary>
-        </details>
-        {% endif %}
       </div>
       {% if aliases_rest %}
-      <div class="flex flex-wrap gap-2 mt-2">
-        {% for alias in aliases_rest %}
-        <span class="text-xs text-gray-700 bg-gray-950 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
-        {% endfor %}
-      </div>
+      <details class="mt-2">
+        <summary class="text-xs text-gray-700 hover:text-gray-500 cursor-pointer font-mono-sys list-none underline underline-offset-2 decoration-dotted">
+          +{{ aliases_rest|length }} more
+        </summary>
+        <div class="flex flex-wrap gap-2 mt-2">
+          {% for alias in aliases_rest %}
+          <span class="text-xs text-gray-700 bg-gray-950 px-2 py-0.5 rounded font-mono-sys">{{ alias }}</span>
+          {% endfor %}
+        </div>
+      </details>
       {% endif %}
       {% endif %}
     </div>
