@@ -4,6 +4,26 @@ DCC Codex — System AI persona writer.
 For each entity with sufficient passages, generates a short profile written in the
 System AI voice from the DCC books: bureaucratic game-show dystopia, slightly sinister,
 corporate-clinical, with dry dark humor. Runs the DB migration first (idempotent).
+
+2026-07-28 fix (post live audit showing 1848/1948 -- ~95% -- of ALL persona_text rows
+sitewide cut off mid-sentence, caught by manually reading Carl's persona_text and
+finding it truncated at 81 characters): gemini-3.6-flash spends a large, variable
+number of tokens on internal "thinking" before writing any visible output (487-907+
+tokens observed in direct reproduction). The original max_output_tokens=512 budget
+covers thinking alone in many cases, leaving almost nothing for the actual profile
+text, so the response silently hits MAX_TOKENS after only a few words. The API still
+returns a non-empty response.text in this case, so the old code (which only checked
+for an empty string and a set of scratchpad-leakage patterns) accepted these truncated
+fragments as valid and wrote them straight to the DB.
+
+Fixed by (a) raising max_output_tokens to a much more generous budget (thinking can
+vary a lot, so this leaves real headroom instead of just nudging the old cap), and
+(b) explicitly checking finish_reason and rejecting (leaving NULL for retry) any
+response that still hit MAX_TOKENS, exactly like the existing scratchpad-leakage
+rejection path -- never trust a response just because response.text is non-empty.
+Confirmed via direct reproduction: the same prompt that produced a 64-char fragment
+under the old config produced a clean, complete, finish_reason=STOP profile at
+max_output_tokens=2048.
 """
 
 import logging
@@ -17,6 +37,7 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 RATE_LIMIT_SECONDS = 1.0
+MAX_OUTPUT_TOKENS = 2048
 
 # The voice: Dungeon System AI — omniscient dungeon announcer, treats everything as metrics,
 # bureaucratic corporate-speak crossed with reality-TV energy, slightly ominous.
@@ -91,27 +112,41 @@ def run_migrate(conn) -> None:
     logger.info("Migration: persona_text column ensured.")
 
 
-def run_persona(conn, gemini_api_key: str, batch_size: int = 999999) -> int:
-    """Generate System AI persona text for entities without it."""
+def run_persona(conn, gemini_api_key: str, batch_size: int = 999999, entity_ids=None) -> int:
+    """Generate System AI persona text for entities without it.
+
+    If entity_ids is given, (re)generate exactly those entities regardless of whether
+    persona_text is already set -- targeted mode, used for regenerating known-bad rows.
+    Otherwise, only fills entities where persona_text IS NULL (original batch mode).
+    """
     run_migrate(conn)
 
     client = genai.Client(api_key=gemini_api_key)
 
     cur = conn.cursor()
-    cur.execute("""
-        SELECT e.id, e.name, e.entity_type
-        FROM entities e
-        WHERE e.persona_text IS NULL
-          AND EXISTS (SELECT 1 FROM passages p WHERE p.entity_id = e.id)
-        ORDER BY e.is_major DESC, e.name
-        LIMIT %s
-    """, (batch_size,))
+    if entity_ids:
+        cur.execute("""
+            SELECT e.id, e.name, e.entity_type
+            FROM entities e
+            WHERE e.id = ANY(%s) AND EXISTS (SELECT 1 FROM passages p WHERE p.entity_id = e.id)
+            ORDER BY e.id
+        """, (entity_ids,))
+    else:
+        cur.execute("""
+            SELECT e.id, e.name, e.entity_type
+            FROM entities e
+            WHERE e.persona_text IS NULL
+              AND EXISTS (SELECT 1 FROM passages p WHERE p.entity_id = e.id)
+            ORDER BY e.is_major DESC, e.name
+            LIMIT %s
+        """, (batch_size,))
     entities = cur.fetchall()
     cur.close()
 
     logger.info(f"Generating personas for {len(entities)} entities...")
     count = 0
     rejected = 0
+    truncated = 0
 
     for entity_id, entity_name, entity_type in entities:
         # Fetch passages — prioritize physical + personality; cap at ~3000 chars
@@ -161,7 +196,7 @@ def run_persona(conn, gemini_api_key: str, batch_size: int = 999999) -> int:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.75,
-                    max_output_tokens=512,
+                    max_output_tokens=MAX_OUTPUT_TOKENS,
                     safety_settings=[
                         types.SafetySetting(category="HARM_CATEGORY_HARASSMENT",        threshold="BLOCK_NONE"),
                         types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH",       threshold="BLOCK_NONE"),
@@ -171,6 +206,20 @@ def run_persona(conn, gemini_api_key: str, batch_size: int = 999999) -> int:
                 ),
             )
             time.sleep(RATE_LIMIT_SECONDS)
+
+            # Reject silently-truncated responses BEFORE looking at the text at all --
+            # a MAX_TOKENS finish means the model was cut off mid-thought, regardless
+            # of whether response.text happens to look plausible at a glance.
+            finish_reason = None
+            if response.candidates:
+                finish_reason = response.candidates[0].finish_reason
+            if finish_reason is not None and str(finish_reason).endswith("MAX_TOKENS"):
+                truncated += 1
+                logger.warning(
+                    f"  REJECTED truncated (MAX_TOKENS) persona for '{entity_name}' "
+                    f"(id={entity_id}), leaving NULL for retry: {(response.text or '')[:80]!r}"
+                )
+                continue
 
             persona_text = (response.text or "").strip()
             if not persona_text:
@@ -202,5 +251,8 @@ def run_persona(conn, gemini_api_key: str, batch_size: int = 999999) -> int:
             time.sleep(RATE_LIMIT_SECONDS)
             continue
 
-    logger.info(f"Persona generation complete: {count} entities processed, {rejected} rejected as malformed.")
+    logger.info(
+        f"Persona generation complete: {count} entities processed, "
+        f"{rejected} rejected as malformed, {truncated} rejected as truncated (MAX_TOKENS)."
+    )
     return count
