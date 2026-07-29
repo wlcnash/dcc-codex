@@ -133,6 +133,13 @@
     }
     .passage-quote:hover { border-left-color: var(--gold); }
 
+    /* 2026-07-29: brief highlight for a passage jumped to via a stat/skill row's
+       #passage-N link (see entity_detail.html), so it's clear which quote is being pointed
+       to instead of the page just silently scrolling. Uses the card's own hover-shadow
+       language (gold offset shadow) rather than a background-color flash, so it reads as
+       "this is the one" using a technique already established elsewhere on the site. */
+    .passage-highlight { box-shadow: 3px 3px 0 0 var(--gold-dim) !important; transition: box-shadow 0.3s ease; }
+
     /* Spoiler shield -- round 9 (2026-07-29): rounds 2-3 only recolored/de-boxed this
        component and it STILL read as slop, because the problem was never the color or the
        border -- it was the composition. A full-width, centered, icon-led announcement row
