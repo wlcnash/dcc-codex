@@ -108,7 +108,9 @@
     <div class="p-2.5">
       <div class="text-sm font-semibold text-gray-200 truncate leading-tight">{{ entity.name }}</div>
       <div class="flex items-center gap-1.5 mt-1.5">
-        <span class="badge-{{ entity.entity_type.value }} capitalize font-mono-sys tracking-wide" style="font-size:0.65rem">
+        <!-- 2026-07-29: same fix as home.html -- `capitalize` renders "npc" as "Npc"; an
+             acronym needs `uppercase`, not title-case. -->
+        <span class="badge-{{ entity.entity_type.value }} uppercase font-mono-sys tracking-wide" style="font-size:0.65rem">
           {{ entity.entity_type.value }}
         </span>
         {% if entity.boss_tier %}
