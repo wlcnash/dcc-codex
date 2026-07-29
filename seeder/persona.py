@@ -91,10 +91,15 @@ Rules:
 - Write entirely in the System AI voice
 - Make it punchy and specific — no generic sentences that could apply to any entity
 - Vary your sentence subjects — don't lead every sentence with the entity's name
-- Do NOT open with a rigid "[Label]: [description]" declaration (e.g. "Contestant
-  classification:", "Threat classification:", "Designation:") — that exact templated shape is
-  itself an AI-generated-text tell regardless of which words fill it in. Open with an actual
-  sentence instead.
+- Do NOT open with a rigid bureaucratic tag, whether or not it uses a colon. This includes
+  BOTH "[Label]: [description]" declarations (e.g. "Contestant classification:", "Threat
+  classification:", "Designation:") AND colon-less passive-voice tag openers (e.g. "Designated
+  as a...", "Classified as a...", "Registered as/under...", "Operating as...", "Deployment of
+  this...", "Described as..."). Both are the exact same AI-generated-text tell — a rigid
+  templated shape — regardless of which words fill it in or whether a colon is present. Open
+  with an actual, varied sentence instead. If you notice yourself reaching for a passive
+  "[Verb]-ed as/under a..." construction as your first words, rewrite the sentence with the
+  entity or a concrete detail as the grammatical subject instead.
 - Never use the word "contestant" for a dungeon participant — the book's own term is "crawler"
   (confirmed directly against the source text: "crawler" appears 228 times in the corpus,
   "contestant" appears exactly once, in unrelated dialogue). Use "crawler" instead.
@@ -144,6 +149,16 @@ _INVALID_PERSONA_PATTERNS = [
     # would have kept being stored as broken persona text on every future run forever.
     r"^\s*\(",                                  # response starts with a parenthetical, never legitimate prose
     r"\([\w\s/]{2,40}\):\s*\*",                 # "(Label/Label):*" outline-section markers
+    # 2026-07-29 (round 11, direct-read miss): a genuinely random full-text read (not another
+    # keyword grep) turned up id=385 "D-0NAH": "The System / Operational Status):*\n ..." --
+    # the exact same outline-marker leak shape as the pattern above, just missing its OPENING
+    # paren (truncated/malformed differently), so the paren-anchored pattern never matched it.
+    # This slipped through the "0/1948 fail" audit reported earlier today as clean, which is
+    # exactly why a hand-picked keyword search is not sufficient evidence of "no slop left" --
+    # only reading actual samples surfaces shapes you didn't already know to grep for. The
+    # "):* " sequence itself is never legitimate prose regardless of whether it has a matching
+    # opening paren, so match it unconditionally instead of requiring the open-paren context.
+    r"\):\s*\*",
     # 2026-07-29 (round 10, live-corpus miss): the 2026-07-29 prompt fix added a RULE telling
     # the model not to open with a rigid "[Label]: [description]" declaration, and the
     # existing 1948-row audit was re-run afterward -- but that audit only checked the leak
@@ -171,6 +186,19 @@ _INVALID_PERSONA_PATTERNS = [
     # enumerate every possible continuation.
     r"(?i)\blet'?s\b",
     r"(?i)\bstyle parameters\b",
+    # 2026-07-29 (round 11): a word-frequency count across the full corpus (not another
+    # single-example grep) found the SAME rigid-tag-opener tell as the "[Label]:" fix, just
+    # without a colon -- a colon-less passive-voice bureaucratic tag as the entity's first
+    # word(s). "Designated as a" alone opened 132/1948 entities; "Designated as the/an" another
+    # 54; combined with Classified/Registered/Operating as/Deployment of/Described as, 412 of
+    # 1948 entities (21%) open this way. Critically, 21 of the 236 entities just regenerated
+    # under the colon-only gate STILL hit this -- including "Monk Seals" (id=1190), which was
+    # manually checked live in the browser and reported clean, because the check that day only
+    # looked for the colon shape. Confirms the same lesson as the colon fix, learned the hard
+    # way twice now: a prompt RULE is not a gate, and "I checked for the specific words in the
+    # thing I already found" is not the same as "I checked for the shape." This pattern makes
+    # the colon-less version of the same tell a real, un-bypassable rejection gate too.
+    r"^\s*(designated|classified|registered|deployment\s+of|described\s+as|operating\s+as|cataloged|catalogued|logged|filed|tagged|flagged|assigned|marked|labell?ed|indexed|recorded|listed)\b",
 ]
 
 
