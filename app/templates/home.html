@@ -132,7 +132,11 @@
         <div class="p-2.5">
           <div class="text-sm font-semibold text-gray-200 truncate leading-tight">{{ entity.name }}</div>
           <div class="flex items-center gap-1.5 mt-1">
-            <span class="text-xs badge-{{ entity.entity_type.value }} capitalize font-mono-sys tracking-wide">
+            <!-- 2026-07-29: CSS `capitalize` on an acronym renders "Npc" instead of "NPC" --
+                 Wes caught this live. Swapped to `uppercase`, matching how this same value
+                 already renders correctly on the entity detail page (via a parent uppercase
+                 wrapper there). -->
+            <span class="text-xs badge-{{ entity.entity_type.value }} uppercase font-mono-sys tracking-wide">
               {{ entity.entity_type.value }}
             </span>
             {% if entity.boss_tier %}
