@@ -187,18 +187,40 @@ def entity_detail(slug: str, request: Request, db: Session=Depends(get_db)):
     # Verified stats/skills only -- see seeder/verify_stats.py. A row is trustworthy
     # for public display only once BOTH independent verification passes confirmed it;
     # unverified/flagged rows are never shown on the page.
+    #
+    # 2026-07-29: floor_id has been 100% populated on both tables since extraction, but this
+    # query never used it -- it pulled every verified row regardless of floor, so an entity
+    # whose stat was mentioned at multiple points in the story (a level-up, a different scene)
+    # showed ALL of those values stacked on one page with no indication of when each applied.
+    # Verified example: Princess Donut's CHA showed 2, 37, 39, 41, 276 simultaneously (floors
+    # 1 and 6). Fixed with DISTINCT ON: per stat_name/skill_name, keep only the row from the
+    # highest floor_number at or before the current spoiler-shield position (or highest overall
+    # if the shield is off) -- i.e. the most recently known value as of where the reader is in
+    # the story, same floor-awareness already applied to passages/images on this page.
     stat_rows = db.execute(text("""
-        SELECT stat_name, value, value_type, reason
-        FROM entity_stats
-        WHERE entity_id = :eid AND verify_pass1 = true AND verify_pass2 = true
+        SELECT stat_name, value, value_type, reason, source_passage_id FROM (
+            SELECT DISTINCT ON (s.stat_name) s.stat_name, s.value, s.value_type, s.reason,
+                   s.source_passage_id, f.floor_number
+            FROM entity_stats s
+            JOIN floors f ON f.id = s.floor_id
+            WHERE s.entity_id = :eid AND s.verify_pass1 = true AND s.verify_pass2 = true
+              AND (:max_floor IS NULL OR f.floor_number <= :max_floor)
+            ORDER BY s.stat_name, f.floor_number DESC
+        ) latest
         ORDER BY stat_name
-    """), {"eid": entity.id}).fetchall()
+    """), {"eid": entity.id, "max_floor": max_floor}).fetchall()
     skill_rows = db.execute(text("""
-        SELECT skill_name, level, value_type, reason
-        FROM entity_skills
-        WHERE entity_id = :eid AND verify_pass1 = true AND verify_pass2 = true
+        SELECT skill_name, level, value_type, reason, source_passage_id FROM (
+            SELECT DISTINCT ON (s.skill_name) s.skill_name, s.level, s.value_type, s.reason,
+                   s.source_passage_id, f.floor_number
+            FROM entity_skills s
+            JOIN floors f ON f.id = s.floor_id
+            WHERE s.entity_id = :eid AND s.verify_pass1 = true AND s.verify_pass2 = true
+              AND (:max_floor IS NULL OR f.floor_number <= :max_floor)
+            ORDER BY s.skill_name, f.floor_number DESC
+        ) latest
         ORDER BY skill_name
-    """), {"eid": entity.id}).fetchall()
+    """), {"eid": entity.id, "max_floor": max_floor}).fetchall()
 
     # Curate aliases: show a handful up front, rest behind a "+N more" toggle in the template
     aliases = entity.aliases or []
