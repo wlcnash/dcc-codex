@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, text
 import boto3
 from botocore.config import Config
 from database import get_db, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
-from models import Book, Chapter, ChapterFloor, Entity, EntityAppearance, Floor, Passage, EntityRelationship, EntityTypeEnum
+from models import Book, Chapter, ChapterFloor, Entity, EntityAppearance, Floor, Passage, EntityRelationship, EntityTypeEnum, BossTierEnum
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="DCC Codex", docs_url=None, redoc_url=None)
@@ -19,6 +19,12 @@ IMAGE_BUCKET = "dcc-codex"
 
 ENTITY_TYPE_LABELS = {"crawler":"Crawlers","npc":"NPCs","mob":"Mobs","item":"Items","location":"Locations","floor":"Floors","ability":"Abilities","faction":"Factions","deity":"Deities","media":"Media","other":"Other"}
 ENTITY_TYPE_ICONS = {"crawler":"🎯","npc":"👤","mob":"🐉","item":"⚔","location":"🗺","floor":"🏚","ability":"✨","faction":"⚑","deity":"⚡","media":"📺","other":"◈"}
+
+# 2026-07-29: boss tier, confirmed against actual passage text (see models.py's BossTierEnum
+# docstring) -- ordered smallest to largest administrative scope, matching the book's own
+# escalation (a crawler clears neighborhood bosses before borough, city, province, country).
+BOSS_TIER_LABELS = {"neighborhood":"Neighborhood Boss","borough":"Borough Boss","city":"City Boss","province":"Province Boss","country":"Country Boss","floor":"Floor Boss"}
+BOSS_TIER_ORDER = ["neighborhood","borough","city","province","country","floor"]
 
 def get_max_floor(request: Request):
     val = request.cookies.get("max_floor")
@@ -32,7 +38,7 @@ def base_context(request: Request, db: Session) -> dict:
     max_floor = get_max_floor(request)
     floors = get_floors(db)
     max_floor_obj = next((f for f in floors if f.floor_number == max_floor), None) if max_floor else None
-    return {"request": request, "floors": floors, "max_floor": max_floor, "max_floor_obj": max_floor_obj, "entity_type_icons": ENTITY_TYPE_ICONS}
+    return {"request": request, "floors": floors, "max_floor": max_floor, "max_floor_obj": max_floor_obj, "entity_type_icons": ENTITY_TYPE_ICONS, "boss_tier_labels": BOSS_TIER_LABELS}
 
 def get_minio_client():
     return boto3.client("s3", endpoint_url=MINIO_ENDPOINT, aws_access_key_id=MINIO_ACCESS_KEY, aws_secret_access_key=MINIO_SECRET_KEY, config=Config(signature_version="s3v4"))
@@ -131,7 +137,8 @@ def home(request: Request, db: Session=Depends(get_db)):
 
 @app.get("/browse", response_class=HTMLResponse)
 def browse(request: Request, entity_type: Optional[str]=Query(None), q: Optional[str]=Query(None),
-           major_only: bool=Query(False), page: int=Query(1,ge=1), per_page: int=Query(48,ge=1,le=100),
+           major_only: bool=Query(False), boss_tier: Optional[str]=Query(None),
+           page: int=Query(1,ge=1), per_page: int=Query(48,ge=1,le=100),
            db: Session=Depends(get_db)):
     ctx = base_context(request, db)
     max_floor = ctx["max_floor"]
@@ -141,12 +148,15 @@ def browse(request: Request, entity_type: Optional[str]=Query(None), q: Optional
     if q:
         query = query.filter(or_(Entity.name.ilike(f"%{q}%"), Entity.summary.ilike(f"%{q}%")))
     if major_only: query = query.filter(Entity.is_major==True)
+    if boss_tier and boss_tier in [t.value for t in BossTierEnum]:
+        query = query.filter(Entity.boss_tier==boss_tier)
     if max_floor is not None:
         query = query.outerjoin(ChapterFloor, Entity.first_chapter_id==ChapterFloor.chapter_id).filter(or_(Entity.first_chapter_id==None, ChapterFloor.floor_number<=max_floor))
     total = query.count()
     entities = query.order_by(Entity.is_major.desc(), Entity.name).offset((page-1)*per_page).limit(per_page).all()
     ctx.update({"entities": entities, "entity_type": entity_type, "entity_type_labels": ENTITY_TYPE_LABELS,
-                "q": q, "major_only": major_only, "page": page, "per_page": per_page,
+                "q": q, "major_only": major_only, "boss_tier": boss_tier, "boss_tier_order": BOSS_TIER_ORDER,
+                "page": page, "per_page": per_page,
                 "total": total, "total_pages": (total+per_page-1)//per_page})
     return templates.TemplateResponse("entity_list.html", ctx)
 
