@@ -59,11 +59,20 @@
            class="accent-[#8a6a28]">
     MAJOR ONLY
   </label>
+  <!-- 2026-07-29: boss tier filter -- orthogonal to entity_type (bosses seen so far are
+       mob, but the taxonomy isn't restricted to that), so this is its own dropdown rather
+       than folded into the type tabs above. -->
+  <select name="boss_tier" class="book-select bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-300 py-1.5 pl-2 focus:outline-none focus:border-[#4a3a10] cursor-pointer transition">
+    <option value="" class="bg-gray-900">Any boss tier</option>
+    {% for tier in boss_tier_order %}
+    <option value="{{ tier }}" class="bg-gray-900" {% if boss_tier == tier %}selected{% endif %}>{{ boss_tier_labels[tier] }}</option>
+    {% endfor %}
+  </select>
   <button type="submit"
           class="bg-[#2e2408] hover:bg-[#3d2f0c] border border-[#4a3a10] text-gold px-4 py-1.5 rounded text-xs font-mono-sys tracking-wide transition">
     FILTER
   </button>
-  {% if q or major_only %}
+  {% if q or major_only or boss_tier %}
   <a href="/browse{% if entity_type %}?entity_type={{ entity_type }}{% endif %}"
      class="text-xs text-gray-400 hover:text-gray-200 transition font-mono-sys">CLEAR</a>
   {% endif %}
@@ -102,6 +111,14 @@
         <span class="badge-{{ entity.entity_type.value }} capitalize font-mono-sys tracking-wide" style="font-size:0.65rem">
           {{ entity.entity_type.value }}
         </span>
+        {% if entity.boss_tier %}
+        <!-- 2026-07-29: plain text + middot, same treatment as every other type label on
+             this site (round 3 dropped filled badge chips sitewide) -- reuses the existing
+             muted-red "danger" semantic already assigned to badge-mob, since a boss is by
+             definition the dangerous version of whatever it is. -->
+        <span class="text-gray-600" aria-hidden="true">·</span>
+        <span class="font-mono-sys tracking-wide" style="font-size:0.65rem; color:#c97070;">{{ boss_tier_labels[entity.boss_tier.value] }}</span>
+        {% endif %}
         {% if entity.is_major %}
         <span class="text-gray-600" aria-hidden="true">·</span>
         <span class="text-gold text-xs">★</span>
