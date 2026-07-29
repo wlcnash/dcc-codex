@@ -136,6 +136,14 @@ _INVALID_PERSONA_PATTERNS = [
     r"(?i)\bstrictly factual\b",
     r"(?i)\bno heading,?\s*no quotes\b",
     r"(?im)^\s{0,3}#{1,6}\s",                   # markdown headings
+    # 2026-07-29: a second, previously-undetected leak shape found via direct DB audit --
+    # 8 entities had persona_text that was actually a fragment of the model's own outline/
+    # planning scratchpad, e.g. "(Comparison):*", "(Physical/Visuals/Auditory):*",
+    # "(Optional 4th):* A dry observation...", "Sentence 3: Focus on...". These don't contain
+    # "drafting" or "attempt N" so the original patterns above missed them entirely, and
+    # would have kept being stored as broken persona text on every future run forever.
+    r"^\s*\(",                                  # response starts with a parenthetical, never legitimate prose
+    r"\([\w\s/]{2,40}\):\s*\*",                 # "(Label/Label):*" outline-section markers
 ]
 
 
