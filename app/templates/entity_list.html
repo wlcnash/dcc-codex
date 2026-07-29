@@ -14,8 +14,11 @@
     {% endif %}
   </h1>
   {% if max_floor %}
-  <span class="font-mono-sys text-xs text-gold tracking-wide">
-    ■ Filtered through Floor {{ max_floor }}
+  <!-- 2026-07-29 round 9: dropped the icon-glyph "chip" treatment -- the nav's spoiler-shield
+       control is now the single source of truth for this state, so this is a plain caption,
+       not a second status indicator repeating the same fact in a different shape. -->
+  <span class="font-mono-sys text-xs text-gray-400 tracking-wide">
+    Showing through Floor {{ max_floor }}
   </span>
   {% endif %}
 </div>
@@ -78,8 +81,12 @@
 {% if entities %}
 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
   {% for entity in entities %}
+  <!-- 2026-07-29 round 9: dropped hover:scale-[1.02] -- .dungeon-card already has its own
+       considered hover feedback (offset-shadow grows + gold tint), so a scale transform
+       stacked on top was two competing hover effects firing at once, plus the exact
+       uniform-scale-every-card interaction the AI-slop animation dimension flags. -->
   <a href="/entity/{{ entity.slug }}"
-     class="dungeon-card rounded-lg overflow-hidden group transition-all hover:scale-[1.02]">
+     class="dungeon-card rounded-lg overflow-hidden group transition-all">
     {% if entity.image_url %}
     <img src="{{ entity.image_url }}" alt="{{ entity.name }}"
          class="w-full aspect-square object-cover group-hover:opacity-90 transition">
