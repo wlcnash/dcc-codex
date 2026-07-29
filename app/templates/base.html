@@ -60,13 +60,23 @@
     .font-display  { font-family: 'Cinzel', serif; }
     .font-mono-sys { font-family: 'JetBrains Mono', 'Fira Mono', monospace; }
 
-    /* Cards */
+    /* Cards -- round 5 (2026-07-28): a flat 1px neutral-gray border as a card's ONLY
+       separation technique is independently named "the #1 slop tell" by multiple 2026
+       design-industry sources, and this exact rule survived unchanged through 3 prior
+       aesthetic rounds because those rounds focused on badges/pills/composition and never
+       audited the base card component itself. Correct order per the research: whitespace,
+       then a background-lightness shift, then soft/bespoke elevation, and only reach for a
+       border if the first three aren't enough. This site already had the background shift
+       (--dungeon-card is lighter than --dungeon-bg); dropped the border entirely and added a
+       small bespoke offset shadow instead of a border-color hover swap -- a hand-picked hard
+       offset shadow reads as a chosen decision, unlike a generic soft shadow-md/lg blur
+       (also independently named as its own tell). */
     .dungeon-card {
       background: var(--dungeon-card);
-      border: 1px solid var(--dungeon-border);
-      transition: border-color 0.15s ease;
+      box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.35);
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
     }
-    .dungeon-card:hover { border-color: var(--dungeon-border-hover); }
+    .dungeon-card:hover { box-shadow: 3px 3px 0 0 var(--gold-dim); }
 
     /* Type labels -- round 3 (2026-07-28): the round-2 fix consolidated 11 neon hues down
        to 4 filled color chips, but a filled-background rounded tag is itself a named "AI
@@ -76,10 +86,17 @@
        type do the work that a "badge" UI-kit component usually does. Dropped the background
        fill entirely; type is now distinguished by color + a middot separator in the
        surrounding markup, not by a box. */
-    .badge-crawler, .badge-item, .badge-ability, .badge-deity, .badge-media { color: #d4af37; }  /* warm/gold family */
-    .badge-npc, .badge-faction, .badge-floor, .badge-location { color: #6baed6; }                /* cool slate family */
-    .badge-mob   { color: #c97070; } /* single muted red: danger */
-    .badge-other { color: #9ca3af; } /* neutral gray: catch-all */
+    /* Round 5: research explicitly says constrain a palette to ~2 non-neutral colors, with
+       real semantic states (danger/success/etc) kept separate from decorative brand hues --
+       not "add a second decorative hue for variety," which is still slop, just recolored.
+       The gold/blue split above was exactly that: blue had no semantic meaning, it existed
+       purely to make half the badges visually different from the other half. Dropped it --
+       type is now gold (the one brand accent, for anything crawler/protagonist-adjacent) or
+       plain neutral gray (everything else), with red kept as the one legitimate semantic
+       exception (danger). Down to exactly 2 non-neutral colors total, sitewide. */
+    .badge-crawler, .badge-item, .badge-ability, .badge-deity, .badge-media { color: #d4af37; }  /* warm/gold: the one brand accent */
+    .badge-npc, .badge-faction, .badge-floor, .badge-location, .badge-other { color: #9ca3af; }  /* neutral gray: everything non-semantic */
+    .badge-mob   { color: #c97070; } /* single muted red: the one semantic exception (danger) */
 
     /* System AI terminal block */
     .system-terminal {
