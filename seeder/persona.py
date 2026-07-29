@@ -95,6 +95,9 @@ Rules:
   classification:", "Threat classification:", "Designation:") — that exact templated shape is
   itself an AI-generated-text tell regardless of which words fill it in. Open with an actual
   sentence instead.
+- Never use the word "contestant" for a dungeon participant — the book's own term is "crawler"
+  (confirmed directly against the source text: "crawler" appears 228 times in the corpus,
+  "contestant" appears exactly once, in unrelated dialogue). Use "crawler" instead.
 - No heading, no quotes, no markdown — just the raw profile text
 - IMPORTANT: this profile is shown to visitors regardless of which floor/point in the story they're
   reading about, so it must describe PERMANENT, DURABLE traits only — build, personality, standing
