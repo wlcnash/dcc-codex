@@ -278,7 +278,9 @@
             }
             <div class="min-w-0">
               <div class="text-sm text-gray-200 truncate">${e.name}</div>
-              <div class="text-xs text-gray-400 capitalize mt-0.5">${e.type}</div>
+              <!-- 2026-07-29: same capitalize->uppercase fix as the other two badge spots
+                   (an acronym like "npc" needs uppercase, not title-case). -->
+              <div class="text-xs text-gray-400 uppercase mt-0.5">${e.type}</div>
             </div>
           </a>
         `).join('');
@@ -287,7 +289,13 @@
     });
 
     function entityIcon(type) {
-      const icons = { character:'👤', creature:'🐉', item:'⚔', location:'🗺', floor:'🏚', ability:'✨', faction:'⚑' };
+      // 2026-07-29: this map still had the RETIRED entity_type values (character, creature --
+      // dropped from the taxonomy on 2026-07-27) and was missing 6 of the current 11 types
+      // entirely (crawler, npc, mob, deity, media, other all fell through to the generic
+      // fallback icon). Nobody re-checked this JS copy when ENTITY_TYPE_ICONS was updated in
+      // main.py during the taxonomy migration. Synced to match main.py's ENTITY_TYPE_ICONS
+      // exactly -- if that dict changes again, this needs to change with it.
+      const icons = { crawler:'🎯', npc:'👤', mob:'🐉', item:'⚔', location:'🗺', floor:'🏚', ability:'✨', faction:'⚑', deity:'⚡', media:'📺', other:'◈' };
       return icons[type] || '◈';
     }
 
