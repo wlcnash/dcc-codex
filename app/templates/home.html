@@ -135,6 +135,10 @@
             <span class="text-xs badge-{{ entity.entity_type.value }} capitalize font-mono-sys tracking-wide">
               {{ entity.entity_type.value }}
             </span>
+            {% if entity.boss_tier %}
+            <span class="text-gray-600" aria-hidden="true">·</span>
+            <span class="text-xs font-mono-sys tracking-wide" style="color:#c97070;">{{ boss_tier_labels[entity.boss_tier.value] }}</span>
+            {% endif %}
             {% if entity.is_major %}
             <span class="text-gray-600" aria-hidden="true">·</span>
             <span class="text-gold text-xs">★</span>
