@@ -144,6 +144,33 @@ _INVALID_PERSONA_PATTERNS = [
     # would have kept being stored as broken persona text on every future run forever.
     r"^\s*\(",                                  # response starts with a parenthetical, never legitimate prose
     r"\([\w\s/]{2,40}\):\s*\*",                 # "(Label/Label):*" outline-section markers
+    # 2026-07-29 (round 10, live-corpus miss): the 2026-07-29 prompt fix added a RULE telling
+    # the model not to open with a rigid "[Label]: [description]" declaration, and the
+    # existing 1948-row audit was re-run afterward -- but that audit only checked the leak
+    # patterns above, which say nothing about this shape. The rule was a soft instruction with
+    # no hard gate behind it, and it only got RETROACTIVELY applied to entities that happened
+    # to also contain the word "contestant". A broader sweep (prompted by Wes catching that
+    # the site still had this problem after the "0/1948 fail" report) found 151 more entities
+    # opening with the exact same rigid shape using other label words entirely -- "Item
+    # designation:", "Ability Classification:", "Threat classification:", "Crawler
+    # designation:", "Faction designation:", "System AI style parameters:", etc. -- proving the
+    # instruction alone doesn't reliably stop the model, and that "we told it not to" is not
+    # the same as "it can't get through validation." This pattern makes the rule a real gate:
+    # reject any response that opens with a short (<=5 word) label phrase immediately followed
+    # by a colon, regardless of which words fill it in, exactly the same shape/not-vocabulary
+    # principle already established for the "contestant" fix.
+    r"^\s*[A-Za-z][\w'/-]*(?:\s+[A-Za-z][\w'/-]*){0,4}\s*:\s",
+    # 2026-07-29: broadened while investigating the above -- two more leak shapes found live
+    # in the same sweep that the existing patterns should have caught but didn't: id=87 "Apple
+    # Core" had a trailing "-> Let's make it more System-esque." (old pattern only matched
+    # "let's stay/make sure/double-check/verify/keep", not "let's make it"), and id=1190
+    # "Monk Seals" had literally leaked the PERSONA_PROMPT's own voice-description text
+    # ("System AI style parameters: Corporate form-speak, ...") instead of writing a profile.
+    # The voice never has legitimate reason to say "let's" (it's a third-person System AI, not
+    # a collaborative first-person writer), so reject the phrase outright rather than trying to
+    # enumerate every possible continuation.
+    r"(?i)\blet'?s\b",
+    r"(?i)\bstyle parameters\b",
 ]
 
 
