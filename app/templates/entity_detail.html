@@ -215,15 +215,20 @@
              passages joined with a real blank line (see item_descriptions.py) -- without
              white-space: pre-line, HTML collapses that into one run-on paragraph. Harmless
              for the LLM-paraphrased single-paragraph text every other entity_type still
-             uses, so applying it sitewide is safe. -->
+             uses, so applying it sitewide is safe.
+             linked_persona_html is the same text with other known entities (gear, other
+             characters, etc.) wrapped in links -- see linkify_text() in main.py. It's
+             pre-escaped there, so `| safe` is required to render the injected <a> tags
+             (never render un-escaped user/book text with `| safe` directly -- this is only
+             safe because linkify_text() escapes every character itself before this point). -->
         <p class="text-sm leading-relaxed" style="color: #d4a847; white-space: pre-line;">
-          {{ entity.persona_text }}
+          {{ linked_persona_html | safe }}
         </p>
       </div>
     </div>
     {% elif entity.summary %}
     <!-- Fallback: show extracted summary if no persona yet -->
-    <p class="text-gray-400 leading-relaxed mb-6 text-lg">{{ entity.summary }}</p>
+    <p class="text-gray-400 leading-relaxed mb-6 text-lg">{{ linked_summary_html | safe }}</p>
     {% endif %}
 
     <!-- 2026-07-28 round 6: Quick Facts and Stats/Skills moved into the right-side infobox
