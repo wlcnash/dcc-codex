@@ -15,6 +15,20 @@ class PassageTypeEnum(str, enum.Enum):
     physical="physical"; personality="personality"; backstory="backstory"
     ability="ability"; action="action"; other="other"
 
+class BossTierEnum(str, enum.Enum):
+    """2026-07-29: the book uses an explicit administrative-scope ladder for boss-monster
+    encounters, confirmed directly against passage text (stat-block lines like "Level 145
+    Country Boss") rather than assumed from genre convention -- neighborhood < borough < city
+    < province < country, with a separate "floor" tier for the single biggest boss on a floor
+    (confirmed via a passage explicitly grouping "Province, Country, or Floor Boss" together
+    as a formal item-buff category). Nullable on Entity -- most entities are not bosses at
+    all, and this is orthogonal to entity_type (bosses seen so far are entity_type=mob, but
+    the text also describes at least one NPC-turned-boss, so this is intentionally not
+    restricted to a single entity_type, same reasoning as Species being pulled out on
+    2026-07-27)."""
+    neighborhood="neighborhood"; borough="borough"; city="city"
+    province="province"; country="country"; floor="floor"
+
 class Book(Base):
     __tablename__="books"
     id=Column(Integer,primary_key=True); title=Column(String(255),nullable=False)
@@ -75,6 +89,7 @@ class Entity(Base):
     first_chapter_id=Column(Integer,ForeignKey("chapters.id")); summary=Column(Text)
     persona_text=Column(Text); image_url=Column(Text); image_prompt=Column(Text)
     image_source_passages=Column(ARRAY(Text)); is_major=Column(Boolean,default=False)
+    boss_tier=Column(Enum(BossTierEnum,name="boss_tier"),nullable=True)
     created_at=Column(DateTime,default=datetime.utcnow)
     updated_at=Column(DateTime,default=datetime.utcnow,onupdate=datetime.utcnow)
     first_book=relationship("Book",foreign_keys=[first_book_id])
