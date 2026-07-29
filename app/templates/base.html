@@ -133,17 +133,15 @@
     }
     .passage-quote:hover { border-left-color: var(--gold); }
 
-    /* Spoiler shield banner -- round 2 (2026-07-28) recolored this from neon-green to gold
-       but kept a colored 3px left-border accent strip, which research identifies as its own
-       independent "AI slop" tell (the single most common one on stat cards/callouts),
-       regardless of color. Round 3: dropped the accent stripe and the filled background
-       entirely -- this is now a plain hairline top/bottom rule, closer to a persistent
-       terminal status line than a "notification card" UI-kit component. */
-    .spoiler-shield {
-      background: transparent;
-      border-top: 1px solid #3d2e00;
-      border-bottom: 1px solid #3d2e00;
-    }
+    /* Spoiler shield -- round 9 (2026-07-29): rounds 2-3 only recolored/de-boxed this
+       component and it STILL read as slop, because the problem was never the color or the
+       border -- it was the composition. A full-width, centered, icon-led announcement row
+       sitting above the nav is structurally identical to a cookie-consent bar or a SaaS promo
+       banner, the single most recognizable "generated template" shape there is, independent
+       of any styling applied to it. No amount of recoloring a banner un-makes it a banner.
+       Removed the standalone banner entirely -- the floor selector in the nav (which is the
+       actual spoiler-shield control, not just a display of its state) now carries the label
+       directly, so the mechanism and its explanation live in one place instead of two. */
 
     /* Inline info callouts (zero-results notice, hidden-passage-count notice) -- round 3:
        these previously reused .spoiler-shield's boxed treatment, which read as a floating
@@ -173,19 +171,6 @@
 </head>
 <body class="text-gray-200 min-h-screen">
 
-  <!-- Spoiler shield banner -->
-  {% if max_floor %}
-  <div class="spoiler-shield px-4 py-2 text-center text-xs text-gold font-mono-sys tracking-wide">
-    <span class="text-gold-dim" aria-hidden="true">■</span>
-    SPOILER SHIELD ACTIVE — Showing content through
-    <strong>Floor {{ max_floor }}</strong>
-    <span class="text-gold-dim mx-2" aria-hidden="true">·</span>
-    <a href="/set-floor?redirect_to={{ request.url.path }}" class="text-gold hover:text-[#e0c065] underline underline-offset-2 transition">
-      Clear filter
-    </a>
-  </div>
-  {% endif %}
-
   <!-- Nav -->
   <!-- 2026-07-28 round 3: dropped bg-opacity-70 + backdrop-blur-sm -- a translucent,
        blurred nav bar is another named AI-slop tell ("the same backdrop-blur-md nav").
@@ -207,21 +192,31 @@
         <a href="/browse?entity_type=location" class="text-gray-400 hover:text-gold transition hidden lg:inline">Locations</a>
       </div>
 
-      <!-- Floor selector -->
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <span class="text-gray-400 text-xs font-mono-sys hidden sm:inline">FLOOR:</span>
+      <!-- Spoiler shield control -- round 9 (2026-07-29): this select IS the spoiler shield,
+           not just a floor filter with a separate banner announcing it elsewhere. Folding the
+           label and the clear-action into the one control that actually does something removes
+           the redundant announcement-bar pattern entirely instead of re-skinning it again. -->
+      <div class="flex items-center gap-2 flex-shrink-0" title="Spoiler shield: hides content past the selected floor">
+        <span class="text-gray-400 text-xs font-mono-sys hidden sm:inline">SPOILER SHIELD:</span>
         <select
           id="floor-selector"
           class="book-select bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-300 py-1 pl-2 focus:outline-none focus:border-[#4a3a10] cursor-pointer transition"
         >
-          <option value="" class="bg-gray-900">All Floors</option>
+          <option value="" class="bg-gray-900">Off (all floors)</option>
           {% for floor in floors %}
           <option value="{{ floor.floor_number }}" class="bg-gray-900"
             {% if max_floor == floor.floor_number %}selected{% endif %}>
-            Floor {{ floor.floor_number }}
+            Through Floor {{ floor.floor_number }}
           </option>
           {% endfor %}
         </select>
+        {% if max_floor %}
+        <a href="/set-floor?redirect_to={{ request.url.path }}"
+           class="text-gray-400 hover:text-gold text-xs transition"
+           title="Clear spoiler shield — show all floors" aria-label="Clear spoiler shield">
+          ✕
+        </a>
+        {% endif %}
       </div>
 
       <!-- Typeahead search -->
