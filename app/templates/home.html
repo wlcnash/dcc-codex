@@ -18,7 +18,9 @@
      they only made sense as hero-section bookends. -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 py-10 mb-16 items-start">
   <div class="lg:col-span-2">
-    <div class="font-mono-sys text-xs text-gold-dim tracking-widest mb-3 uppercase">Contestant Knowledge Base — Dungeon System v8.3.1</div>
+    <!-- 2026-07-29 round 7: same fix as "Notable Crawlers" below -- "Contestant" isn't the
+         book's term (see passage-count check), "Crawler" is. -->
+    <div class="font-mono-sys text-xs text-gold-dim tracking-widest mb-3 uppercase">Crawler Knowledge Base — Dungeon System v8.3.1</div>
     <h1 class="font-display text-4xl md:text-5xl font-semibold text-gold mb-3 tracking-wide">DCC Codex</h1>
     <p class="text-gray-400 text-base max-w-lg leading-relaxed">
       Source-anchored visual compendium for <em class="text-gray-300 not-italic">Dungeon Crawler Carl</em>.
@@ -105,7 +107,12 @@
   {% if featured %}
   <div class="lg:col-span-3">
     <div class="flex items-end justify-between mb-3">
-      <div class="font-mono-sys text-xs text-gray-400 tracking-widest uppercase">Notable Contestants</div>
+      <!-- 2026-07-29 round 7: "Contestant" was never validated against the actual book text --
+           queried passages directly: "crawler" appears 228 times, "contestant" appears exactly
+           ONCE, in a single throwaway line of dialogue about someone else ("your fellow
+           contestant, that caprid guy..."), not as the show's or book's standing term for
+           dungeon participants. Renamed to the term the text actually uses. -->
+      <div class="font-mono-sys text-xs text-gray-400 tracking-widest uppercase">Notable Crawlers</div>
       <a href="/browse?major_only=true" class="text-xs text-gray-400 hover:text-gold transition">View all →</a>
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
