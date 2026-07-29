@@ -85,15 +85,31 @@
       {% if stat_rows %}
       <table class="w-full text-xs mb-3">
         <tbody>
-          {% for stat_name, value, value_type, reason in stat_rows %}
+          {% for stat_name, value, value_type, reason, source_passage_id in stat_rows %}
           <tr class="border-b border-gray-900 last:border-0">
-            <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">{{ stat_name }}</td>
-            <td class="py-1.5 text-gray-300 tabular-nums text-right" title="{{ reason }}">
-              {% if value is none %}
-              <span class="text-gray-400">?</span>
+            <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">
+              <!-- 2026-07-29: stat/skill names now link straight to the verbatim book
+                   passage they were extracted from (source_passage_id, previously stored but
+                   unused) instead of only offering the AI-paraphrased "reason" in a tooltip.
+                   Jumps to and expands the matching quote in the Source Passages section
+                   below via #passage-N + the small script at the bottom of this template. -->
+              {% if source_passage_id %}
+              <a href="#passage-{{ source_passage_id }}" class="hover:text-gold underline underline-offset-2 decoration-dotted transition">{{ stat_name }}</a>
               {% else %}
-              {{ '+' if value_type == 'delta' and value > 0 }}{{ value }}
-              <span class="text-gray-400">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
+              {{ stat_name }}
+              {% endif %}
+            </td>
+            <td class="py-1.5 text-gray-300 tabular-nums text-right">
+              {% if value is none %}
+              <!-- 2026-07-29: dotted underline signals this is hoverable -- previously a bare
+                   "?" with a title= tooltip and no visual cue it had one. Means "verified as
+                   real, but the book never gave it a specific number," not a broken render. -->
+              <span class="text-gray-400 underline underline-offset-2 decoration-dotted cursor-help" title="{{ reason }}">?</span>
+              {% else %}
+              <span title="{{ reason }}">
+                {{ '+' if value_type == 'delta' and value > 0 }}{{ value }}
+                <span class="text-gray-400">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
+              </span>
               {% endif %}
             </td>
           </tr>
@@ -104,14 +120,22 @@
       {% if skill_rows %}
       <table class="w-full text-xs">
         <tbody>
-          {% for skill_name, level, value_type, reason in skill_rows %}
+          {% for skill_name, level, value_type, reason, source_passage_id in skill_rows %}
           <tr class="border-b border-gray-900 last:border-0">
-            <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">{{ skill_name }}</td>
-            <td class="py-1.5 text-gray-300 tabular-nums text-right" title="{{ reason }}">
-              {% if level is none %}
-              <span class="text-gray-400">?</span>
+            <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">
+              {% if source_passage_id %}
+              <a href="#passage-{{ source_passage_id }}" class="hover:text-gold underline underline-offset-2 decoration-dotted transition">{{ skill_name }}</a>
               {% else %}
-              Lv. {{ level }}{{ ' (bonus)' if value_type == 'delta' else '' }}
+              {{ skill_name }}
+              {% endif %}
+            </td>
+            <td class="py-1.5 text-gray-300 tabular-nums text-right">
+              {% if level is none %}
+              <span class="text-gray-400 underline underline-offset-2 decoration-dotted cursor-help" title="{{ reason }}">?</span>
+              {% else %}
+              <span title="{{ reason }}">
+                Lv. {{ level }}{{ ' (bonus)' if value_type == 'delta' else '' }}
+              </span>
               {% endif %}
             </td>
           </tr>
@@ -274,7 +298,7 @@
         {% set passage = item.passage %}
         {% set chapter = item.chapter %}
         {% set book    = item.book %}
-        <div class="dungeon-card rounded-lg p-5">
+        <div class="dungeon-card rounded-lg p-5" id="passage-{{ passage.id }}">
 
           <!-- Source citation -->
           <div class="font-mono-sys text-xs text-gray-400 mb-3 flex flex-wrap items-center gap-1.5 tracking-wide">
@@ -330,5 +354,25 @@
   {% endif %}
 </div>
 {% endif %}
+
+<!-- 2026-07-29: stat/skill rows link to #passage-N inside the Source Passages <details>
+     block above, but a plain in-page anchor won't auto-open a closed <details> or scroll to
+     content still collapsed inside it. This opens the containing <details> and scrolls to the
+     target passage, on load and on same-page hash clicks, with a brief highlight so it's
+     obvious which quote is being pointed to. -->
+<script>
+  function revealPassageFromHash() {
+    if (!location.hash.startsWith('#passage-')) return;
+    const el = document.querySelector(location.hash);
+    if (!el) return;
+    const details = el.closest('details');
+    if (details) details.open = true;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('passage-highlight');
+    setTimeout(() => el.classList.remove('passage-highlight'), 2000);
+  }
+  window.addEventListener('DOMContentLoaded', revealPassageFromHash);
+  window.addEventListener('hashchange', revealPassageFromHash);
+</script>
 
 {% endblock %}
