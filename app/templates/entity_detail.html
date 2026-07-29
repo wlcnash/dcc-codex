@@ -139,6 +139,12 @@
         <span class="text-gray-600" aria-hidden="true">·</span>
         <span class="text-gray-400">{{ entity.species.name }}</span>
         {% endif %}
+        {% if entity.boss_tier %}
+        <!-- 2026-07-29: boss tier, same plain color+middot treatment as everything else on
+             this line -- reuses the muted-red danger color already assigned to badge-mob. -->
+        <span class="text-gray-600" aria-hidden="true">·</span>
+        <span style="color:#c97070;">{{ boss_tier_labels[entity.boss_tier.value] }}</span>
+        {% endif %}
         {% if entity.is_major %}
         <span class="text-gray-600" aria-hidden="true">·</span>
         <span class="text-gold">★ MAJOR</span>
