@@ -198,7 +198,16 @@ _INVALID_PERSONA_PATTERNS = [
     # way twice now: a prompt RULE is not a gate, and "I checked for the specific words in the
     # thing I already found" is not the same as "I checked for the shape." This pattern makes
     # the colon-less version of the same tell a real, un-bypassable rejection gate too.
-    r"^\s*(designated|classified|registered|deployment\s+of|described\s+as|operating\s+as|cataloged|catalogued|logged|filed|tagged|flagged|assigned|marked|labell?ed|indexed|recorded|listed)\b",
+    # NOTE (round 11 self-correction): this pattern originally shipped WITHOUT an (?i) flag,
+    # so it silently matched nothing -- every real example ("Classified as a troll mob...",
+    # "Designated as a...") starts with a capitalized word since it's the first word of the
+    # sentence, and the bare lowercase alternation never matches a capital "C"/"D". Caught this
+    # by directly testing the fix against a known-bad example (Stevie, id=1242) instead of
+    # trusting a clean audit count -- the very first full validation run after deploying this
+    # pattern reported only 133 failures instead of the ~412 found by manual regex, which
+    # should have been the tip-off on its own. Added (?i) so this actually does what the
+    # comment above claims.
+    r"(?i)^\s*(designated|classified|registered|deployment\s+of|described\s+as|operating\s+as|cataloged|catalogued|logged|filed|tagged|flagged|assigned|marked|labell?ed|indexed|recorded|listed)\b",
 ]
 
 
