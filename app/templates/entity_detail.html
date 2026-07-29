@@ -15,10 +15,19 @@
 </nav>
 
 <!-- Header block -->
+<!-- 2026-07-28 round 6: real fan-wiki convention (researched: Fandom's own infobox
+     documentation) puts the image + quick facts + stats in a RIGHT-side infobox, with the
+     article's actual prose on the LEFT -- the opposite of this page's old layout (image
+     fixed-left, everything else crammed into a right column). Swapped to match: main
+     content (name, description, connections) reads first and widest on the left; the
+     infobox (image, quick facts, stats/skills -- i.e. exactly "descriptions, stats, and
+     pics," per Wes's own framing) sits on the right, the way every Fandom character page
+     does it. Markup order puts the infobox first so mobile (single column) still shows the
+     picture before the prose; `order-*` classes flip it to right-side on desktop. -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
 
-  <!-- Image -->
-  <div class="lg:col-span-1">
+  <!-- Infobox: image + quick facts + stats -->
+  <div class="lg:col-span-1 lg:order-2">
     {% if entity.image_url %}
     <div class="relative rounded-xl overflow-hidden border border-gray-800 shadow-2xl group">
       <img src="{{ entity.image_url }}" alt="{{ entity.name }}"
@@ -28,13 +37,88 @@
     {% else %}
     <div class="w-full aspect-square rounded-xl border border-gray-900 bg-gray-950 flex flex-col items-center justify-center">
       <span class="text-5xl mb-3 opacity-20">{{ entity_type_icons[entity.entity_type.value] }}</span>
-      <span class="font-mono-sys text-gray-400 text-xs tracking-widest">NO IMAGE GENERATED</span>
+      <span class="font-mono-sys text-gray-400 text-xs tracking-widest">NO IMAGE</span>
+    </div>
+    {% endif %}
+
+    <!-- Quick facts -->
+    <div class="dungeon-card rounded-lg p-4 text-sm mt-5 space-y-2.5">
+      {% if first_book %}
+      <div class="flex gap-3 items-baseline">
+        <span class="font-mono-sys text-gray-400 text-xs tracking-wide w-28 flex-shrink-0 uppercase">First Appears</span>
+        <span class="text-gray-400">
+          <em class="not-italic">{{ first_book.title }}</em>
+          {% if first_chapter %}
+          <span class="text-gray-400 mx-1">·</span>
+          {% if first_chapter.chapter_title %}
+          <span class="text-gray-400">{{ first_chapter.chapter_title }}</span>
+          {% else %}
+          <span class="text-gray-400">Ch. {{ first_chapter.chapter_number }}</span>
+          {% endif %}
+          {% endif %}
+        </span>
+      </div>
+      {% endif %}
+      <div class="flex gap-3 items-baseline">
+        <span class="font-mono-sys text-gray-400 text-xs tracking-wide w-28 flex-shrink-0 uppercase">Total Passages</span>
+        <span class="text-gray-400 tabular-nums">
+          {{ visible_count }}
+          {% if hidden_count > 0 %}
+          <span class="text-gold text-xs font-mono-sys ml-1">
+            ({{ hidden_count }} hidden — spoiler shield)
+          </span>
+          {% endif %}
+        </span>
+      </div>
+    </div>
+
+    <!-- Stats / Skills infobox (only verified rows -- see entity_stats/entity_skills verify_pass1/verify_pass2) -->
+    {% if stat_rows or skill_rows %}
+    <div class="dungeon-card rounded-lg p-4 text-sm mt-5">
+      <div class="font-mono-sys text-xs text-gray-400 tracking-widest mb-3 uppercase">Stats &amp; Skills</div>
+      {% if stat_rows %}
+      <table class="w-full text-xs mb-3">
+        <tbody>
+          {% for stat_name, value, value_type, reason in stat_rows %}
+          <tr class="border-b border-gray-900 last:border-0">
+            <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">{{ stat_name }}</td>
+            <td class="py-1.5 text-gray-300 tabular-nums text-right" title="{{ reason }}">
+              {% if value is none %}
+              <span class="text-gray-400">?</span>
+              {% else %}
+              {{ '+' if value_type == 'delta' and value > 0 }}{{ value }}
+              <span class="text-gray-400">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+      {% if skill_rows %}
+      <table class="w-full text-xs">
+        <tbody>
+          {% for skill_name, level, value_type, reason in skill_rows %}
+          <tr class="border-b border-gray-900 last:border-0">
+            <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">{{ skill_name }}</td>
+            <td class="py-1.5 text-gray-300 tabular-nums text-right" title="{{ reason }}">
+              {% if level is none %}
+              <span class="text-gray-400">?</span>
+              {% else %}
+              Lv. {{ level }}{{ ' (bonus)' if value_type == 'delta' else '' }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
     </div>
     {% endif %}
   </div>
 
-  <!-- Meta column -->
-  <div class="lg:col-span-2">
+  <!-- Main content -->
+  <div class="lg:col-span-2 lg:order-1">
 
     <!-- Name + type line -->
     <div class="mb-5">
@@ -101,86 +185,9 @@
     <p class="text-gray-400 leading-relaxed mb-6 text-lg">{{ entity.summary }}</p>
     {% endif %}
 
-    <!-- Quick facts -->
-    <div class="dungeon-card rounded-lg p-4 text-sm mb-5 space-y-2.5">
-      {% if first_book %}
-      <div class="flex gap-3 items-baseline">
-        <span class="font-mono-sys text-gray-400 text-xs tracking-wide w-32 flex-shrink-0 uppercase">First Appears</span>
-        <span class="text-gray-400">
-          <em class="not-italic">{{ first_book.title }}</em>
-          {% if first_chapter %}
-          <span class="text-gray-400 mx-1">·</span>
-          {% if first_chapter.chapter_title %}
-          <span class="text-gray-400">{{ first_chapter.chapter_title }}</span>
-          {% else %}
-          <span class="text-gray-400">Ch. {{ first_chapter.chapter_number }}</span>
-          {% endif %}
-          {% endif %}
-        </span>
-      </div>
-      {% endif %}
-      <div class="flex gap-3 items-baseline">
-        <span class="font-mono-sys text-gray-400 text-xs tracking-wide w-32 flex-shrink-0 uppercase">Total Passages</span>
-        <span class="text-gray-400 tabular-nums">
-          {{ visible_count }}
-          {% if hidden_count > 0 %}
-          <span class="text-gold text-xs font-mono-sys ml-1">
-            ({{ hidden_count }} hidden — spoiler shield)
-          </span>
-          {% endif %}
-        </span>
-      </div>
-    </div>
-
-    <!-- Stats / Skills infobox (only verified rows -- see entity_stats/entity_skills verify_pass1/verify_pass2) -->
-    {% if stat_rows or skill_rows %}
-    <div class="dungeon-card rounded-lg p-4 text-sm mb-5">
-      <div class="font-mono-sys text-xs text-gray-400 tracking-widest mb-3 uppercase">Stats &amp; Skills</div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {% if stat_rows %}
-        <div>
-          <table class="w-full text-xs">
-            <tbody>
-              {% for stat_name, value, value_type, reason in stat_rows %}
-              <tr class="border-b border-gray-900 last:border-0">
-                <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">{{ stat_name }}</td>
-                <td class="py-1.5 text-gray-300 tabular-nums" title="{{ reason }}">
-                  {% if value is none %}
-                  <span class="text-gray-400">?</span>
-                  {% else %}
-                  {{ '+' if value_type == 'delta' and value > 0 }}{{ value }}
-                  <span class="text-gray-400">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% endif %}
-        {% if skill_rows %}
-        <div>
-          <table class="w-full text-xs">
-            <tbody>
-              {% for skill_name, level, value_type, reason in skill_rows %}
-              <tr class="border-b border-gray-900 last:border-0">
-                <td class="py-1.5 pr-2 text-gray-400 font-mono-sys">{{ skill_name }}</td>
-                <td class="py-1.5 text-gray-300 tabular-nums" title="{{ reason }}">
-                  {% if level is none %}
-                  <span class="text-gray-400">?</span>
-                  {% else %}
-                  Lv. {{ level }}{{ ' (bonus)' if value_type == 'delta' else '' }}
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
+    <!-- 2026-07-28 round 6: Quick Facts and Stats/Skills moved into the right-side infobox
+         above (Fandom-wiki convention) -- removed the duplicate copies that used to live here
+         in the main content column. -->
 
     <!-- Relationships -->
     {% if relationships %}
