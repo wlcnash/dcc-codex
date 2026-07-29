@@ -29,13 +29,19 @@
   <!-- Infobox: image + quick facts + stats -->
   <div class="lg:col-span-1 lg:order-2">
     {% if entity.image_url %}
-    <div class="relative rounded-xl overflow-hidden border border-gray-800 shadow-2xl group">
+    <!-- 2026-07-29 round 9: this portrait still had a flat gray border AND a generic
+         shadow-2xl blur -- the same "flat border + soft shadow" combo flagged and removed
+         from .dungeon-card in round 5, just missed here since this infobox image block
+         didn't exist until round 6. Swapped to the same bespoke offset-shadow language used
+         everywhere else on the site, no border, for one consistent elevation technique
+         instead of two competing ones. -->
+    <div class="relative rounded-xl overflow-hidden group" style="box-shadow: 4px 4px 0 0 rgba(0,0,0,0.4);">
       <img src="{{ entity.image_url }}" alt="{{ entity.name }}"
            class="w-full object-cover group-hover:scale-[1.02] transition duration-500">
       <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60"></div>
     </div>
     {% else %}
-    <div class="w-full aspect-square rounded-xl border border-gray-900 bg-gray-950 flex flex-col items-center justify-center">
+    <div class="w-full aspect-square rounded-xl bg-gray-950 flex flex-col items-center justify-center" style="box-shadow: 4px 4px 0 0 rgba(0,0,0,0.4);">
       <span class="text-5xl mb-3 opacity-20">{{ entity_type_icons[entity.entity_type.value] }}</span>
       <span class="font-mono-sys text-gray-400 text-xs tracking-widest">NO IMAGE</span>
     </div>
