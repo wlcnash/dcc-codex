@@ -108,13 +108,14 @@ def serve_image_png(slug: str):
 def home(request: Request, db: Session=Depends(get_db)):
     ctx = base_context(request, db)
     max_floor = ctx["max_floor"]
-    # "Notable Crawlers" (renamed 2026-07-29 from "Notable Contestants" -- queried passages
-    # directly and "contestant" appears exactly once in the whole corpus, in throwaway dialogue
-    # about someone else, vs. 228 uses of "crawler"; "crawler" is the book's actual term) --
-    # this previously had no entity_type filter, so major NPCs/items/mobs/deities could show up
-    # under a section about dungeon competitors, which is factually wrong in-universe. Wes
-    # caught this live ("why are there a mix of creatures in contestants").
-    featured_q = db.query(Entity).filter(Entity.is_major==True, Entity.image_url.isnot(None), Entity.entity_type==EntityTypeEnum.crawler)
+    # "Notable Entities" (2026-07-29, round 8): the site is an entity knowledge base where
+    # crawler is one entity_type among 11 (crawler/npc/mob/item/ability/location/floor/faction/
+    # deity/media/other) -- 257 of 1948 entities are crawlers. Round 6 restricted this query to
+    # crawler-only because the heading was "Notable Contestants"/"Notable Crawlers", which
+    # falsely implied a crawler-specific section. Now that the heading and eyebrow line are
+    # generic ("Notable Entities"/"Entity Knowledge Base"), a mix of entity_type values here is
+    # correct and matches the site's actual scope -- reverted to no entity_type filter.
+    featured_q = db.query(Entity).filter(Entity.is_major==True, Entity.image_url.isnot(None))
     if max_floor is not None:
         featured_q = featured_q.outerjoin(ChapterFloor, Entity.first_chapter_id==ChapterFloor.chapter_id).filter(or_(Entity.first_chapter_id==None, ChapterFloor.floor_number<=max_floor))
     ctx.update({
