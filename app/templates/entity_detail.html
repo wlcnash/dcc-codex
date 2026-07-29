@@ -211,7 +211,12 @@
         </span>
       </div>
       <div class="system-terminal-body">
-        <p class="text-sm leading-relaxed" style="color: #d4a847;">
+        <!-- 2026-07-29: item-type persona_text is now assembled from multiple verbatim
+             passages joined with a real blank line (see item_descriptions.py) -- without
+             white-space: pre-line, HTML collapses that into one run-on paragraph. Harmless
+             for the LLM-paraphrased single-paragraph text every other entity_type still
+             uses, so applying it sitewide is safe. -->
+        <p class="text-sm leading-relaxed" style="color: #d4a847; white-space: pre-line;">
           {{ entity.persona_text }}
         </p>
       </div>
