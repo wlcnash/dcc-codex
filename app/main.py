@@ -1,9 +1,10 @@
 """DCC Codex - FastAPI application."""
-import io, os, logging
+import io, os, re, logging
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from markupsafe import escape
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, text
 import boto3
@@ -39,6 +40,74 @@ def base_context(request: Request, db: Session) -> dict:
     floors = get_floors(db)
     max_floor_obj = next((f for f in floors if f.floor_number == max_floor), None) if max_floor else None
     return {"request": request, "floors": floors, "max_floor": max_floor, "max_floor_obj": max_floor_obj, "entity_type_icons": ENTITY_TYPE_ICONS, "boss_tier_labels": BOSS_TIER_LABELS}
+
+# 2026-07-29: cross-link entity mentions (e.g. a character's gear, other characters) inside
+# description text so they're clickable, per Wes's request. Deliberately conservative about
+# what counts as a linkable name, since a naive "does this substring appear" check would
+# produce constant false-positive links -- this corpus has items literally named things like
+# "Hole" and "Shield" (real entities, seen live on Donut's own skill list), and linking every
+# incidental use of a common word would be worse than no linking at all. Rules:
+#   - Multi-word names (e.g. "Def Leppard cart") are always eligible -- collision with
+#     ordinary prose is essentially impossible.
+#   - Single-word names are only eligible if capitalized, at least 4 characters, and not a
+#     common English word (stoplist below) -- filters out exactly the "Hole"/"Shield" case
+#     while still allowing genuine single-word proper nouns ("Carl", "Donut").
+# Matching is done on the RAW text with word-boundary regexes, longest name first, tracking
+# claimed character spans so a shorter entity name can never match inside a longer one's
+# already-claimed span (no nested/double links regardless of substring relationships between
+# entity names -- e.g. "Carl" is a substring of "Carl's Book of Boom" but the two never
+# collide). HTML-escaping is applied only when reassembling the final string, exactly once
+# per character, so this is safe against book text containing literal "<"/"&"/etc.
+_LINKIFY_STOPWORDS = {
+    "the","a","an","and","or","of","in","on","at","to","for","with","by","is","was","were",
+    "are","this","that","it","he","she","they","i","you","we","his","her","its","their",
+    "him","them","us","our","your","my","me","be","been","being","as","but","if","so","not",
+}
+
+def linkify_text(text: str, exclude_id: int, db: Session) -> str:
+    if not text:
+        return ""
+    rows = db.query(Entity.id, Entity.name, Entity.slug).filter(Entity.id != exclude_id).all()
+    candidates = []
+    for eid, name, slug in rows:
+        if not name:
+            continue
+        name = name.strip()
+        if not name:
+            continue
+        if " " not in name:
+            if len(name) < 4 or name.lower() in _LINKIFY_STOPWORDS or not name[0].isupper():
+                continue
+        candidates.append((name, slug))
+    candidates.sort(key=lambda x: -len(x[0]))
+
+    claimed = []   # list of (start, end) already-linked spans
+    matches = []   # list of (start, end, slug)
+
+    def overlaps(s1, e1, s2, e2):
+        return s1 < e2 and s2 < e1
+
+    for name, slug in candidates:
+        pattern = re.compile(r'\b' + re.escape(name) + r'\b')
+        for m in pattern.finditer(text):
+            s, e = m.span()
+            if any(overlaps(s, e, cs, ce) for cs, ce in claimed):
+                continue
+            claimed.append((s, e))
+            matches.append((s, e, slug))
+
+    if not matches:
+        return str(escape(text))
+
+    matches.sort(key=lambda x: x[0])
+    out = []
+    pos = 0
+    for s, e, slug in matches:
+        out.append(str(escape(text[pos:s])))
+        out.append(f'<a href="/entity/{slug}" class="text-gold hover:underline underline-offset-2">{escape(text[s:e])}</a>')
+        pos = e
+    out.append(str(escape(text[pos:])))
+    return "".join(out)
 
 def get_minio_client():
     return boto3.client("s3", endpoint_url=MINIO_ENDPOINT, aws_access_key_id=MINIO_ACCESS_KEY, aws_secret_access_key=MINIO_SECRET_KEY, config=Config(signature_version="s3v4"))
@@ -227,6 +296,12 @@ def entity_detail(slug: str, request: Request, db: Session=Depends(get_db)):
     aliases_shown = aliases[:8]
     aliases_rest = aliases[8:]
 
+    # 2026-07-29: cross-link other known entities (gear, other characters, etc.) mentioned
+    # in this entity's own description text -- see linkify_text() above for the matching
+    # rules and why a naive substring check isn't safe on this corpus.
+    linked_persona_html = linkify_text(entity.persona_text, entity.id, db) if entity.persona_text else None
+    linked_summary_html = linkify_text(entity.summary, entity.id, db) if (not entity.persona_text and entity.summary) else None
+
     ctx.update({"entity": entity, "passages_by_type": passages_by_type,
                 "passage_type_order": ["physical","personality","ability","backstory","action","other"],
                 "relationships": relationships, "first_book": entity.first_book, "first_chapter": entity.first_chapter,
@@ -234,7 +309,8 @@ def entity_detail(slug: str, request: Request, db: Session=Depends(get_db)):
                 "hidden_count": total_passage_count-len(passages), "visible_count": len(passages),
                 "total_passage_count": total_passage_count, "current_appearance": current_appearance,
                 "stat_rows": stat_rows, "skill_rows": skill_rows,
-                "aliases_shown": aliases_shown, "aliases_rest": aliases_rest})
+                "aliases_shown": aliases_shown, "aliases_rest": aliases_rest,
+                "linked_persona_html": linked_persona_html, "linked_summary_html": linked_summary_html})
     return templates.TemplateResponse("entity_detail.html", ctx)
 
 @app.get("/api/search")
