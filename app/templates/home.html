@@ -117,8 +117,10 @@
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {% for entity in featured %}
+      <!-- 2026-07-29 round 9: dropped hover:scale-[1.02], see entity_list.html note -- same
+           double-hover-effect issue on this grid. -->
       <a href="/entity/{{ entity.slug }}"
-         class="dungeon-card rounded-lg overflow-hidden group transition-all hover:scale-[1.02]">
+         class="dungeon-card rounded-lg overflow-hidden group transition-all">
         {% if entity.image_url %}
         <img src="{{ entity.image_url }}" alt="{{ entity.name }}"
              class="w-full aspect-square object-cover group-hover:opacity-90 transition">
