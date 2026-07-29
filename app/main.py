@@ -108,7 +108,11 @@ def serve_image_png(slug: str):
 def home(request: Request, db: Session=Depends(get_db)):
     ctx = base_context(request, db)
     max_floor = ctx["max_floor"]
-    featured_q = db.query(Entity).filter(Entity.is_major==True, Entity.image_url.isnot(None))
+    # "Notable Contestants" specifically means crawlers (human dungeon competitors) in DCC
+    # lore -- this previously had no entity_type filter, so major NPCs/items/mobs/deities
+    # could show up under a section literally titled "Contestants," which is factually wrong
+    # in-universe. Wes caught this live ("why are there a mix of creatures in contestants").
+    featured_q = db.query(Entity).filter(Entity.is_major==True, Entity.image_url.isnot(None), Entity.entity_type==EntityTypeEnum.crawler)
     if max_floor is not None:
         featured_q = featured_q.outerjoin(ChapterFloor, Entity.first_chapter_id==ChapterFloor.chapter_id).filter(or_(Entity.first_chapter_id==None, ChapterFloor.floor_number<=max_floor))
     ctx.update({
