@@ -27,6 +27,29 @@ ENTITY_TYPE_ICONS = {"crawler":"🎯","npc":"👤","mob":"🐉","item":"⚔","lo
 BOSS_TIER_LABELS = {"neighborhood":"Neighborhood Boss","borough":"Borough Boss","city":"City Boss","province":"Province Boss","country":"Country Boss","floor":"Floor Boss"}
 BOSS_TIER_ORDER = ["neighborhood","borough","city","province","country","floor"]
 
+# 2026-07-30: relation_type is always stored in the FORWARD direction (the entity being
+# scanned's relation TO the other party) -- see seeder/relationships.py's module docstring
+# for the full rationale. This dict is the display-layer mirror: it maps a forward
+# relation_type to how it should read when shown on the OTHER entity's page instead. Kept in
+# sync by hand with SUGGESTED_RELATION_TYPES in seeder/relationships.py -- they're
+# independently-built/deployed images that don't import from each other.
+# Anything not in this dict falls back to the same word on both sides (symmetric display),
+# which is correct for relationships like "ally_of"/"rival_of"/"friend_of"/"sibling_of" and
+# a reasonable default for anything not yet curated.
+RELATION_REVERSE_LABELS = {
+    "guards": "guarded by", "member_of": "has member", "leads": "led by",
+    "mentor_of": "student of", "owns_pet": "pet of", "parent_of": "child of",
+    "serves": "served by", "worships": "worshipped by", "works_at": "employs",
+    "created": "created by",
+}
+
+def _pretty_relation(relation_type: str, viewed_as_a: bool) -> str:
+    """Human-readable label for a relation_type as seen from one side of the pair.
+    See RELATION_REVERSE_LABELS above for why entity_b's page doesn't just echo the
+    same forward-direction word entity_a's page shows."""
+    label = relation_type if viewed_as_a else RELATION_REVERSE_LABELS.get(relation_type, relation_type)
+    return label.replace("_", " ").capitalize()
+
 def get_max_floor(request: Request):
     val = request.cookies.get("max_floor")
     if val and val.isdigit(): return int(val)
@@ -250,8 +273,17 @@ def entity_detail(slug: str, request: Request, db: Session=Depends(get_db)):
         current_appearance = (db.query(EntityAppearance).join(Floor, EntityAppearance.floor_id==Floor.id)
             .filter(EntityAppearance.entity_id==entity.id, Floor.floor_number<=max_floor, EntityAppearance.image_url.isnot(None))
             .order_by(Floor.floor_number.desc()).first())
-    relationships = (db.query(EntityRelationship, Entity).join(Entity, EntityRelationship.entity_b_id==Entity.id).filter(EntityRelationship.entity_a_id==entity.id).all() +
-                     db.query(EntityRelationship, Entity).join(Entity, EntityRelationship.entity_a_id==Entity.id).filter(EntityRelationship.entity_b_id==entity.id).all())
+    # 2026-07-30: previously rendered rel.relation_type verbatim regardless of which side
+    # of the pair this entity is on, which reads backwards for asymmetric relationships (an
+    # entity guarded by a Bopca Protector would have shown "Guards -> Bopca Protector" instead
+    # of "Guarded by -> Bopca Protector"). Now resolved per-row via _pretty_relation() before
+    # it ever reaches the template. See RELATION_REVERSE_LABELS above.
+    relationships_as_a = db.query(EntityRelationship, Entity).join(Entity, EntityRelationship.entity_b_id==Entity.id).filter(EntityRelationship.entity_a_id==entity.id).all()
+    relationships_as_b = db.query(EntityRelationship, Entity).join(Entity, EntityRelationship.entity_a_id==Entity.id).filter(EntityRelationship.entity_b_id==entity.id).all()
+    relationships = (
+        [{"related_entity": other, "label": _pretty_relation(rel.relation_type, True), "evidence": rel.evidence} for rel, other in relationships_as_a]
+        + [{"related_entity": other, "label": _pretty_relation(rel.relation_type, False), "evidence": rel.evidence} for rel, other in relationships_as_b]
+    )
 
     # Verified stats/skills only -- see seeder/verify_stats.py. A row is trustworthy
     # for public display only once BOTH independent verification passes confirmed it;

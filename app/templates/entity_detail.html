@@ -240,12 +240,13 @@
     <div>
       <div class="font-mono-sys text-xs text-gray-400 tracking-widest mb-2 uppercase">Known Connections</div>
       <div class="flex flex-wrap gap-2">
-        {% for rel, related_entity in relationships %}
-        <a href="/entity/{{ related_entity.slug }}"
-           class="flex items-center gap-1.5 dungeon-card rounded px-3 py-1 text-xs transition hover:text-gold">
-          <span class="text-gray-400 capitalize">{{ rel.relation_type }}</span>
+        {% for rel in relationships %}
+        <a href="/entity/{{ rel.related_entity.slug }}"
+           class="flex items-center gap-1.5 dungeon-card rounded px-3 py-1 text-xs transition hover:text-gold"
+           {% if rel.evidence %}title="{{ rel.evidence }}"{% endif %}>
+          <span class="text-gray-400">{{ rel.label }}</span>
           <span class="text-gray-400">·</span>
-          <span class="text-gray-300">{{ related_entity.name }}</span>
+          <span class="text-gray-300">{{ rel.related_entity.name }}</span>
         </a>
         {% endfor %}
       </div>
