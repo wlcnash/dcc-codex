@@ -107,8 +107,13 @@
               <span class="text-gray-400 underline underline-offset-2 decoration-dotted cursor-help" title="{{ reason }}">?</span>
               {% else %}
               <span title="{{ reason }}">
+                {% if value_type == 'percentage' %}
+                +{{ value }}%
+                <span class="text-gray-400">(bonus)</span>
+                {% else %}
                 {{ '+' if value_type == 'delta' and value > 0 }}{{ value }}
                 <span class="text-gray-400">{{ '(bonus)' if value_type == 'delta' else '' }}</span>
+                {% endif %}
               </span>
               {% endif %}
             </td>
@@ -134,7 +139,11 @@
               <span class="text-gray-400 underline underline-offset-2 decoration-dotted cursor-help" title="{{ reason }}">?</span>
               {% else %}
               <span title="{{ reason }}">
+                {% if value_type == 'percentage' %}
+                +{{ level }}% <span class="text-gray-400">(bonus)</span>
+                {% else %}
                 Lv. {{ level }}{{ ' (bonus)' if value_type == 'delta' else '' }}
+                {% endif %}
               </span>
               {% endif %}
             </td>
